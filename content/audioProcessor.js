@@ -36,13 +36,13 @@ class AudioProcessor {
 
       // Attempt to capture audio using different methods
       const success = await this.attemptAudioCapture();
-      
+
       if (success) {
         this.isProcessing = true;
         this.startAudioAnalysis();
         return true;
       }
-      
+
       return false;
     } catch (error) {
       this.handleError('Audio capture failed', error);
@@ -110,7 +110,7 @@ class AudioProcessor {
     try {
       // Create media element source
       this.mediaStreamSource = this.audioContext.createMediaElementSource(this.videoElement);
-      
+
       // Create analyser for audio processing
       this.analyser = this.audioContext.createAnalyser();
       this.analyser.fftSize = 2048;
@@ -118,7 +118,7 @@ class AudioProcessor {
 
       // Connect audio nodes
       this.mediaStreamSource.connect(this.analyser);
-      
+
       // Note: We don't connect to destination to avoid audio feedback
       // this.analyser.connect(this.audioContext.destination);
 
@@ -244,7 +244,7 @@ class AudioProcessor {
         variations++;
       }
     }
-    
+
     const variationRatio = variations / timeDomainData.length;
     return variationRatio > 0.1; // Voice should have at least 10% variation
   }
@@ -300,27 +300,18 @@ class AudioProcessor {
    */
   handleError(message, error) {
     console.error(`AudioProcessor Error: ${message}`, error);
-    
+
     if (this.onErrorCallback) {
-      let userMessage = message;
-      
-      // Provide user-friendly error messages
-      if (error.message.includes('CORS')) {
-        userMessage = 'Cannot access audio due to cross-origin restrictions';
-      } else if (error.message.includes('InvalidStateError')) {
-        userMessage = 'Audio is already being processed by another application';
-      } else if (error.message.includes('NotSupportedError')) {
-        userMessage = 'Audio capture not supported for this video';
-      } else if (error.message.includes('no audio track')) {
-        userMessage = 'This video does not contain audio';
-      }
-      
-      this.onErrorCallback({
+      // Create structured error object for the callback
+      const errorInfo = {
         type: 'audio_capture_error',
-        message: userMessage,
-        originalError: error.message,
-        timestamp: Date.now()
-      });
+        message: error instanceof Error ? error.message : String(error),
+        originalError: error instanceof Error ? error.message : String(error),
+        timestamp: Date.now(),
+        context: message
+      };
+
+      this.onErrorCallback(errorInfo);
     }
   }
 

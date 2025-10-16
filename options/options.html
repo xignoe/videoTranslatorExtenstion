@@ -29,7 +29,17 @@
             <option value="ru">Russian</option>
             <option value="ja">Japanese</option>
             <option value="ko">Korean</option>
-            <option value="zh">Chinese</option>
+            <option value="zh">Chinese (Simplified)</option>
+            <option value="zh-TW">Chinese (Traditional)</option>
+            <option value="ar">Arabic</option>
+            <option value="hi">Hindi</option>
+            <option value="nl">Dutch</option>
+            <option value="sv">Swedish</option>
+            <option value="no">Norwegian</option>
+            <option value="da">Danish</option>
+            <option value="fi">Finnish</option>
+            <option value="pl">Polish</option>
+            <option value="tr">Turkish</option>
           </select>
         </div>
 
@@ -73,6 +83,80 @@
             <option value="center">Center</option>
           </select>
         </div>
+
+        <div class="setting-group">
+          <label for="backgroundOpacity">Background opacity:</label>
+          <div class="slider-container">
+            <input type="range" id="backgroundOpacity" min="0" max="100" value="80" class="slider">
+            <span class="slider-value" id="backgroundOpacityValue">80%</span>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <label for="subtitleMargin">Distance from video edge:</label>
+          <div class="slider-container">
+            <input type="range" id="subtitleMargin" min="10" max="100" value="20" class="slider">
+            <span class="slider-value" id="subtitleMarginValue">20px</span>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <label for="fontFamily">Font family:</label>
+          <select id="fontFamily">
+            <option value="Arial, sans-serif">Arial</option>
+            <option value="Helvetica, sans-serif">Helvetica</option>
+            <option value="'Times New Roman', serif">Times New Roman</option>
+            <option value="'Courier New', monospace">Courier New</option>
+            <option value="Verdana, sans-serif">Verdana</option>
+            <option value="Georgia, serif">Georgia</option>
+          </select>
+        </div>
+
+        <div class="setting-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="enableTextShadow">
+            <span class="checkmark"></span>
+            Add text shadow for better readability
+          </label>
+        </div>
+
+        <div class="setting-group">
+          <label>Preview:</label>
+          <div class="preview-section">
+            <div class="preview-subtitle" id="subtitlePreview">
+              This is how your subtitles will look
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h2>Performance Settings</h2>
+        
+        <div class="setting-group">
+          <label for="translationDelay">Translation delay (seconds):</label>
+          <div class="slider-container">
+            <input type="range" id="translationDelay" min="0" max="5" value="1" step="0.5" class="slider">
+            <span class="slider-value" id="translationDelayValue">1.0s</span>
+          </div>
+          <small class="setting-description">Delay before translating to reduce API calls for rapid speech</small>
+        </div>
+
+        <div class="setting-group">
+          <label for="maxSubtitleLength">Maximum subtitle length:</label>
+          <div class="slider-container">
+            <input type="range" id="maxSubtitleLength" min="50" max="200" value="100" class="slider">
+            <span class="slider-value" id="maxSubtitleLengthValue">100 chars</span>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="enableCaching">
+            <span class="checkmark"></span>
+            Cache translations to improve performance
+          </label>
+        </div>
       </section>
 
       <section class="settings-section">
@@ -92,6 +176,44 @@
             <span class="checkmark"></span>
             Enable keyboard shortcuts
           </label>
+        </div>
+
+        <div class="setting-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="enableDebugMode">
+            <span class="checkmark"></span>
+            Enable debug mode (shows additional information)
+          </label>
+        </div>
+
+        <div class="setting-group">
+          <label for="translationProvider">Translation service:</label>
+          <select id="translationProvider">
+            <option value="google">Google Translate</option>
+            <option value="microsoft">Microsoft Translator</option>
+            <option value="amazon">Amazon Translate</option>
+          </select>
+          <small class="setting-description">Choose your preferred translation service</small>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h2>Backup & Restore</h2>
+        
+        <div class="setting-group">
+          <label>Export your settings:</label>
+          <button id="exportSettings" class="utility-button">Export Settings</button>
+          <small class="setting-description">Download your current settings as a JSON file</small>
+        </div>
+
+        <div class="setting-group">
+          <label>Import settings:</label>
+          <div class="file-input-container">
+            <input type="file" id="importSettings" accept=".json" style="display: none;">
+            <button id="importSettingsButton" class="utility-button">Choose File</button>
+            <span id="importFileName" class="file-name">No file selected</span>
+          </div>
+          <small class="setting-description">Upload a previously exported settings file</small>
         </div>
       </section>
 

@@ -7,7 +7,8 @@
   "permissions": [
     "activeTab",
     "storage",
-    "scripting"
+    "scripting",
+    "contextMenus"
   ],
   
   "host_permissions": [
@@ -22,7 +23,19 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content/content.js"],
+      "js": [
+        "content/errorHandler.js",
+        "content/statusIndicator.js",
+        "content/videoDetector.js",
+        "content/audioProcessor.js",
+        "content/speechRecognizer.js",
+        "content/translationService.js",
+        "content/subtitleStyleManager.js",
+        "content/subtitleRenderer.js",
+        "content/subtitleTimer.js",
+        "content/audioSpeechIntegration.js",
+        "content/content.js"
+      ],
       "run_at": "document_end"
     }
   ],
@@ -49,7 +62,7 @@
   
   "web_accessible_resources": [
     {
-      "resources": ["content/*"],
+      "resources": ["content/*", "background/settingsManager.js"],
       "matches": ["<all_urls>"]
     }
   ]

@@ -154,3 +154,100 @@ input[type="color"] {
   background-color: #f8f9fa;
   border-color: #adb5bd;
 }
+
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.slider {
+  flex: 1;
+  max-width: 300px;
+  height: 6px;
+  border-radius: 3px;
+  background: #e9ecef;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #007bff;
+  cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #007bff;
+  cursor: pointer;
+  border: none;
+}
+
+.slider-value {
+  min-width: 60px;
+  font-weight: 500;
+  color: #495057;
+  text-align: right;
+}
+
+.setting-description {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #6c757d;
+  font-style: italic;
+}
+
+.utility-button {
+  padding: 8px 16px;
+  border: 1px solid #007bff;
+  background-color: white;
+  color: #007bff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.utility-button:hover {
+  background-color: #007bff;
+  color: white;
+}
+
+.file-input-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.file-name {
+  font-size: 14px;
+  color: #6c757d;
+  font-style: italic;
+}
+
+.preview-section {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.preview-subtitle {
+  display: inline-block;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-weight: 500;
+  text-align: center;
+  margin: 0 auto;
+  display: block;
+  width: fit-content;
+}
