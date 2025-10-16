@@ -17,11 +17,36 @@ class SettingsManager {
       translationProvider: 'google',
       showConfidenceIndicator: true,
       maxSubtitleLength: 100,
-      translationDelay: 500
+      translationDelay: 500,
+      // Privacy and security settings
+      privacySettings: {
+        audioProcessingConsent: false,
+        dataTransmissionConsent: false,
+        storageAccessConsent: false,
+        localProcessingOnly: false,
+        encryptTransmissions: true,
+        anonymizeRequests: true,
+        minimizeDataCollection: true
+      }
     };
     
     this.settingsCache = new Map();
     this.changeListeners = new Set();
+    this.dataProtection = null;
+    this.initializeDataProtection();
+  }
+
+  /**
+   * Initialize data protection for settings validation
+   */
+  async initializeDataProtection() {
+    try {
+      if (typeof DataProtection !== 'undefined') {
+        this.dataProtection = new DataProtection();
+      }
+    } catch (error) {
+      console.error('Failed to initialize data protection for settings:', error);
+    }
   }
 
   // Initialize settings with defaults
@@ -112,23 +137,44 @@ class SettingsManager {
 
   // Save settings to storage
   async saveSettings(settings) {
-    return new Promise((resolve, reject) => {
-      chrome.storage.sync.set(settings, () => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else {
-          // Update cache
-          Object.entries(settings).forEach(([key, value]) => {
-            this.settingsCache.set(key, value);
-          });
-          
-          // Notify listeners
-          this.notifySettingsChanged(settings);
-          
-          resolve();
+    try {
+      // Validate settings before saving
+      if (this.dataProtection) {
+        const validation = this.dataProtection.validateSettings(settings);
+        if (!validation.isValid) {
+          throw new Error(`Settings validation failed: ${validation.errors.join(', ')}`);
         }
+        
+        // Use sanitized settings
+        settings = validation.sanitizedSettings;
+        
+        // Log warnings if any
+        if (validation.warnings.length > 0) {
+          console.warn('Settings validation warnings:', validation.warnings);
+        }
+      }
+
+      return new Promise((resolve, reject) => {
+        chrome.storage.sync.set(settings, () => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            // Update cache
+            Object.entries(settings).forEach(([key, value]) => {
+              this.settingsCache.set(key, value);
+            });
+            
+            // Notify listeners
+            this.notifySettingsChanged(settings);
+            
+            resolve();
+          }
+        });
       });
-    });
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      throw error;
+    }
   }
 
   // Save a single setting
@@ -366,6 +412,47 @@ class SettingsManager {
       sourceLanguage,
       autoDetectLanguage: autoDetect
     };
+  }
+
+  // Get privacy settings
+  async getPrivacySettings() {
+    return await this.getSetting('privacySettings');
+  }
+
+  // Update privacy settings
+  async updatePrivacySettings(newPrivacySettings) {
+    const currentSettings = await this.getAllSettings();
+    const updatedSettings = {
+      ...currentSettings,
+      privacySettings: {
+        ...this.defaultSettings.privacySettings,
+        ...currentSettings.privacySettings,
+        ...newPrivacySettings
+      }
+    };
+    
+    await this.saveSettings(updatedSettings);
+    return updatedSettings.privacySettings;
+  }
+
+  // Check if specific privacy consent is granted
+  async hasPrivacyConsent(consentType) {
+    const privacySettings = await this.getPrivacySettings();
+    return privacySettings[`${consentType}Consent`] === true;
+  }
+
+  // Grant privacy consent
+  async grantPrivacyConsent(consentType) {
+    const updates = {};
+    updates[`${consentType}Consent`] = true;
+    return await this.updatePrivacySettings(updates);
+  }
+
+  // Revoke privacy consent
+  async revokePrivacyConsent(consentType) {
+    const updates = {};
+    updates[`${consentType}Consent`] = false;
+    return await this.updatePrivacySettings(updates);
   }
 }
 

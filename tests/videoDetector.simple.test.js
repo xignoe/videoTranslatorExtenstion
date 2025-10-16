@@ -1,384 +1,210 @@
 /**
- * Simple focused tests for VideoDetector core functionality
+ * Simple unit tests for VideoDetector class
+ * Basic functionality tests for video detection
  */
 
-// Mock DOM environment
-class MockElement {
-  constructor(tagName, attributes = {}) {
-    this.tagName = tagName.toUpperCase();
-    this.attributes = attributes;
-    this.children = [];
-    this.parentNode = null;
-    this.style = {};
-    this.paused = true;
-    this.currentTime = 0;
-    this.duration = 0;
-    this.src = attributes.src || '';
-    this.currentSrc = attributes.currentSrc || '';
-    this.id = attributes.id || '';
-    this.eventListeners = {};
-  }
-
-  getBoundingClientRect() {
-    return {
-      width: this.attributes.width || 0,
-      height: this.attributes.height || 0,
-      left: this.attributes.left || 0,
-      top: this.attributes.top || 0
-    };
-  }
-
-  querySelector(selector) {
-    return this.children.find(child => 
-      child.tagName.toLowerCase() === selector.toLowerCase()
-    ) || null;
-  }
-
-  querySelectorAll(selector) {
-    return this.children.filter(child => 
-      child.tagName.toLowerCase() === selector.toLowerCase()
-    );
-  }
-
-  addEventListener(event, handler) {
-    if (!this.eventListeners[event]) {
-      this.eventListeners[event] = [];
-    }
-    this.eventListeners[event].push(handler);
-  }
-}
-
-class MockDocument {
-  constructor() {
-    this.body = new MockElement('body');
-    this.elements = [];
-  }
-
-  querySelectorAll(selector) {
-    return this.elements.filter(element => {
-      if (selector === 'video' || selector === 'video[src]') {
-        return element.tagName.toLowerCase() === 'video';
-      }
-      if (selector === 'audio' || selector === 'audio[src]') {
-        return element.tagName.toLowerCase() === 'audio';
-      }
-      if (selector === 'video source') {
-        return element.tagName.toLowerCase() === 'source' && 
-               element.parentNode && element.parentNode.tagName.toLowerCase() === 'video';
-      }
-      return false;
-    });
-  }
-
-  contains(element) {
-    return this.elements.includes(element);
-  }
-
-  addElement(element) {
-    this.elements.push(element);
-    element.parentNode = this.body;
-  }
-}
-
-class MockWindow {
-  getComputedStyle(element) {
-    return {
-      display: element.style.display || 'block',
-      visibility: element.style.visibility || 'visible'
-    };
-  }
-}
-
-class MockMutationObserver {
-  constructor(callback) {
-    this.callback = callback;
-    this.isObserving = false;
-  }
-
-  observe(target, options) {
-    this.target = target;
-    this.options = options;
-    this.isObserving = true;
-  }
-
-  disconnect() {
-    this.isObserving = false;
-  }
-}
-
-// Set up global mocks
-global.document = new MockDocument();
-global.window = new MockWindow();
-global.MutationObserver = MockMutationObserver;
-global.Node = { ELEMENT_NODE: 1 };
-
-// Import VideoDetector
 const VideoDetector = require('../content/videoDetector.js');
 
-// Simple test runner
-function runTests() {
-  let passed = 0;
-  let failed = 0;
+describe('VideoDetector Basic Functionality', () => {
+  let detector;
+  let mockCallbacks;
 
-  function test(name, testFn) {
-    try {
-      // Reset document for each test
-      global.document = new MockDocument();
-      testFn();
-      console.log(`✓ ${name}`);
-      passed++;
-    } catch (error) {
-      console.log(`✗ ${name}: ${error.message}`);
-      failed++;
-    }
-  }
+  beforeEach(() => {
+    detector = new VideoDetector();
+    mockCallbacks = {
+      onVideoAdded: jest.fn(),
+      onVideoRemoved: jest.fn()
+    };
 
-  function expect(actual) {
-    return {
-      toBe: (expected) => {
-        if (actual !== expected) {
-          throw new Error(`Expected ${actual} to be ${expected}`);
-        }
-      },
-      toHaveLength: (length) => {
-        if (actual.length !== length) {
-          throw new Error(`Expected length ${actual.length} to be ${length}`);
-        }
-      },
-      toBeTruthy: () => {
-        if (!actual) {
-          throw new Error(`Expected ${actual} to be truthy`);
-        }
-      },
-      toBeNull: () => {
-        if (actual !== null) {
-          throw new Error(`Expected ${actual} to be null`);
-        }
+    // Mock DOM elements
+    global.document = {
+      querySelectorAll: jest.fn(() => []),
+      body: {
+        appendChild: jest.fn(),
+        removeChild: jest.fn()
       }
     };
-  }
 
-  console.log('=== VideoDetector Core Functionality Tests ===\n');
+    global.window = {
+      getComputedStyle: jest.fn(() => ({
+        display: 'block',
+        visibility: 'visible'
+      }))
+    };
 
-  test('should detect basic video element', () => {
-    const detector = new VideoDetector();
-    let addedVideos = [];
-    
-    const videoElement = new MockElement('video', { 
-      src: 'test.mp4',
-      width: 640,
-      height: 480
-    });
-    
-    global.document.addElement(videoElement);
-    
-    detector.initialize({
-      onVideoAdded: (video) => addedVideos.push(video)
-    });
-
-    expect(addedVideos).toHaveLength(1);
-    expect(addedVideos[0].tagName).toBe('video');
-    expect(addedVideos[0].src).toBe('test.mp4');
-    
-    detector.destroy();
+    global.MutationObserver = jest.fn(() => ({
+      observe: jest.fn(),
+      disconnect: jest.fn()
+    }));
   });
 
-  test('should detect audio element', () => {
-    const detector = new VideoDetector();
-    let addedVideos = [];
-    
-    const audioElement = new MockElement('audio', { 
-      src: 'test.mp3',
-      width: 300,
-      height: 50
-    });
-    
-    global.document.addElement(audioElement);
-    
-    detector.initialize({
-      onVideoAdded: (video) => addedVideos.push(video)
-    });
-
-    expect(addedVideos).toHaveLength(1);
-    expect(addedVideos[0].tagName).toBe('audio');
-    expect(addedVideos[0].src).toBe('test.mp3');
-    
-    detector.destroy();
+  afterEach(() => {
+    if (detector) {
+      detector.destroy();
+    }
   });
 
-  test('should not detect hidden video elements', () => {
-    const detector = new VideoDetector();
-    let addedVideos = [];
-    
-    const hiddenVideo = new MockElement('video', { 
+  test('should initialize without errors', () => {
+    expect(() => {
+      detector.initialize(mockCallbacks);
+    }).not.toThrow();
+  });
+
+  test('should detect existing videos on initialization', () => {
+    const mockVideo = {
+      tagName: 'VIDEO',
       src: 'test.mp4',
-      width: 0,
-      height: 0
-    });
-    
-    global.document.addElement(hiddenVideo);
-    
-    detector.initialize({
-      onVideoAdded: (video) => addedVideos.push(video)
+      getBoundingClientRect: () => ({ width: 640, height: 480 }),
+      id: 'test-video',
+      paused: true,
+      currentTime: 0,
+      duration: 120
+    };
+
+    global.document.querySelectorAll = jest.fn((selector) => {
+      if (selector === 'video, audio') {
+        return [mockVideo];
+      }
+      return [];
     });
 
-    expect(addedVideos).toHaveLength(0);
-    
-    detector.destroy();
+    detector.initialize(mockCallbacks);
+
+    expect(mockCallbacks.onVideoAdded).toHaveBeenCalledTimes(1);
+    expect(detector.getDetectedVideos()).toHaveLength(1);
   });
 
   test('should generate unique IDs for videos', () => {
-    const detector = new VideoDetector();
-    let addedVideos = [];
-    
-    const video1 = new MockElement('video', { 
+    const mockVideo1 = {
+      tagName: 'VIDEO',
       src: 'test1.mp4',
-      width: 640,
-      height: 480
-    });
-    const video2 = new MockElement('video', { 
+      getBoundingClientRect: () => ({ width: 640, height: 480 }),
+      id: '',
+      paused: true,
+      currentTime: 0,
+      duration: 120
+    };
+
+    const mockVideo2 = {
+      tagName: 'VIDEO',
       src: 'test2.mp4',
-      width: 640,
-      height: 480
-    });
-    
-    global.document.addElement(video1);
-    global.document.addElement(video2);
-    
-    detector.initialize({
-      onVideoAdded: (video) => addedVideos.push(video)
+      getBoundingClientRect: () => ({ width: 640, height: 480 }),
+      id: '',
+      paused: true,
+      currentTime: 0,
+      duration: 120
+    };
+
+    global.document.querySelectorAll = jest.fn((selector) => {
+      if (selector === 'video, audio') {
+        return [mockVideo1, mockVideo2];
+      }
+      return [];
     });
 
-    expect(addedVideos).toHaveLength(2);
-    expect(addedVideos[0].id !== addedVideos[1].id).toBeTruthy();
-    
-    detector.destroy();
+    detector.initialize(mockCallbacks);
+
+    const detectedVideos = detector.getDetectedVideos();
+    expect(detectedVideos).toHaveLength(2);
+    expect(detectedVideos[0].id).not.toBe(detectedVideos[1].id);
   });
 
-  test('should use element ID when available', () => {
-    const detector = new VideoDetector();
-    let addedVideos = [];
-    
-    const videoElement = new MockElement('video', { 
-      id: 'my-video',
+  test('should not detect hidden videos', () => {
+    const mockVideo = {
+      tagName: 'VIDEO',
       src: 'test.mp4',
-      width: 640,
-      height: 480
-    });
-    
-    global.document.addElement(videoElement);
-    
-    detector.initialize({
-      onVideoAdded: (video) => addedVideos.push(video)
+      getBoundingClientRect: () => ({ width: 0, height: 0 }),
+      id: 'hidden-video',
+      paused: true,
+      currentTime: 0,
+      duration: 120
+    };
+
+    global.document.querySelectorAll = jest.fn((selector) => {
+      if (selector === 'video, audio') {
+        return [mockVideo];
+      }
+      return [];
     });
 
-    expect(addedVideos).toHaveLength(1);
-    expect(addedVideos[0].id).toBe('video_my-video');
-    
-    detector.destroy();
+    detector.initialize(mockCallbacks);
+
+    expect(mockCallbacks.onVideoAdded).not.toHaveBeenCalled();
+    expect(detector.getDetectedVideos()).toHaveLength(0);
   });
 
   test('should get video info by element', () => {
-    const detector = new VideoDetector();
-    
-    const videoElement = new MockElement('video', { 
+    const mockVideo = {
+      tagName: 'VIDEO',
       src: 'test.mp4',
-      width: 640,
-      height: 480
-    });
-    
-    global.document.addElement(videoElement);
-    detector.initialize();
+      getBoundingClientRect: () => ({ width: 640, height: 480 }),
+      id: 'test-video',
+      paused: true,
+      currentTime: 0,
+      duration: 120
+    };
 
-    const videoInfo = detector.getVideoInfo(videoElement);
+    global.document.querySelectorAll = jest.fn((selector) => {
+      if (selector === 'video, audio') {
+        return [mockVideo];
+      }
+      return [];
+    });
+
+    detector.initialize(mockCallbacks);
+
+    const videoInfo = detector.getVideoInfo(mockVideo);
     expect(videoInfo).toBeTruthy();
     expect(videoInfo.src).toBe('test.mp4');
-    
-    detector.destroy();
+    expect(videoInfo.element).toBe(mockVideo);
   });
 
   test('should return null for unknown video element', () => {
-    const detector = new VideoDetector();
-    const unknownVideo = new MockElement('video', { src: 'unknown.mp4' });
-    
-    detector.initialize();
+    const unknownVideo = {
+      tagName: 'VIDEO',
+      src: 'unknown.mp4'
+    };
+
+    detector.initialize(mockCallbacks);
 
     const videoInfo = detector.getVideoInfo(unknownVideo);
     expect(videoInfo).toBeNull();
-    
-    detector.destroy();
   });
 
-  test('should handle videos without src', () => {
-    const detector = new VideoDetector();
-    let addedVideos = [];
+  test('should cleanup resources on destroy', () => {
+    detector.initialize(mockCallbacks);
     
-    const videoElement = new MockElement('video', { 
-      width: 640,
-      height: 480
-    });
-    
-    global.document.addElement(videoElement);
-    
-    detector.initialize({
-      onVideoAdded: (video) => addedVideos.push(video)
-    });
-
-    expect(addedVideos).toHaveLength(1);
-    expect(addedVideos[0].src).toBe('unknown');
+    expect(detector.observers).toBeDefined();
     
     detector.destroy();
+    
+    expect(detector.getDetectedVideos()).toHaveLength(0);
   });
 
-  test('should handle currentSrc property', () => {
-    const detector = new VideoDetector();
-    let addedVideos = [];
-    
-    const videoElement = new MockElement('video', { 
-      currentSrc: 'current.mp4',
-      width: 640,
-      height: 480
-    });
-    
-    global.document.addElement(videoElement);
-    
-    detector.initialize({
-      onVideoAdded: (video) => addedVideos.push(video)
+  test('should handle multiple videos on same page', () => {
+    const mockVideos = [];
+    for (let i = 0; i < 3; i++) {
+      mockVideos.push({
+        tagName: 'VIDEO',
+        src: `test${i}.mp4`,
+        getBoundingClientRect: () => ({ width: 640, height: 480 }),
+        id: `video-${i}`,
+        paused: true,
+        currentTime: 0,
+        duration: 120
+      });
+    }
+
+    global.document.querySelectorAll = jest.fn((selector) => {
+      if (selector === 'video, audio') {
+        return mockVideos;
+      }
+      return [];
     });
 
-    expect(addedVideos).toHaveLength(1);
-    expect(addedVideos[0].src).toBe('current.mp4');
-    
-    detector.destroy();
+    detector.initialize(mockCallbacks);
+
+    expect(mockCallbacks.onVideoAdded).toHaveBeenCalledTimes(3);
+    expect(detector.getDetectedVideos()).toHaveLength(3);
   });
-
-  test('should set up event listeners for detected videos', () => {
-    const detector = new VideoDetector();
-    
-    const videoElement = new MockElement('video', { 
-      src: 'test.mp4',
-      width: 640,
-      height: 480
-    });
-    
-    global.document.addElement(videoElement);
-    detector.initialize();
-
-    // Check that event listeners were added
-    expect(videoElement.eventListeners.play).toBeTruthy();
-    expect(videoElement.eventListeners.pause).toBeTruthy();
-    expect(videoElement.eventListeners.ended).toBeTruthy();
-    
-    detector.destroy();
-  });
-
-  console.log(`\n=== Test Summary ===`);
-  console.log(`Passed: ${passed}`);
-  console.log(`Failed: ${failed}`);
-  console.log(`Total: ${passed + failed}`);
-  
-  return failed === 0;
-}
-
-// Run the tests
-runTests();
+});

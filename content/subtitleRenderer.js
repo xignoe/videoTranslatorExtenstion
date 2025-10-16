@@ -112,7 +112,7 @@ class SubtitleRenderer {
   }
 
   /**
-   * Position subtitle container relative to video element
+   * Position subtitle container relative to video element (optimized)
    * @param {HTMLElement} container - Subtitle container
    * @param {HTMLVideoElement} videoElement - Video element
    * @param {Object} settings - Positioning settings
@@ -127,19 +127,27 @@ class SubtitleRenderer {
     const width = videoRect.width;
     const height = videoRect.height;
     
-    Object.assign(container.style, {
-      top: `${top}px`,
-      left: `${left}px`,
-      width: `${width}px`,
-      height: `${height}px`
-    });
-
-    // Adjust for video position type
-    if (videoStyle.position === 'fixed') {
-      container.style.position = 'fixed';
-      container.style.top = `${videoRect.top}px`;
-      container.style.left = `${videoRect.left}px`;
-    }
+    // Use transform for better performance instead of changing layout properties
+    const isFixed = videoStyle.position === 'fixed';
+    const finalTop = isFixed ? videoRect.top : top;
+    const finalLeft = isFixed ? videoRect.left : left;
+    
+    // Batch DOM updates to minimize reflows
+    container.style.cssText = `
+      position: ${isFixed ? 'fixed' : 'absolute'};
+      top: ${finalTop}px;
+      left: ${finalLeft}px;
+      width: ${width}px;
+      height: ${height}px;
+      pointer-events: none;
+      z-index: ${settings.zIndex || 10000};
+      ${this.styleManager ? '' : `
+        display: flex;
+        justify-content: center;
+        align-items: ${settings.position === 'top' ? 'flex-start' : 
+                       settings.position === 'center' ? 'center' : 'flex-end'};
+      `}
+    `;
   }
 
   /**

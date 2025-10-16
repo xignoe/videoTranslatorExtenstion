@@ -24,6 +24,9 @@
     {
       "matches": ["<all_urls>"],
       "js": [
+        "content/dataProtection.js",
+        "content/privacyManager.js",
+        "content/securityIsolation.js",
         "content/errorHandler.js",
         "content/statusIndicator.js",
         "content/videoDetector.js",

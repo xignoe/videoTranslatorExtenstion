@@ -1,6 +1,7 @@
 /**
  * AudioProcessor - Handles audio capture and processing from video elements
  * Uses Web Audio API to capture audio streams and prepare them for speech recognition
+ * Includes privacy protection and secure audio processing
  */
 class AudioProcessor {
   constructor() {
@@ -11,6 +12,25 @@ class AudioProcessor {
     this.videoElement = null;
     this.onAudioDataCallback = null;
     this.onErrorCallback = null;
+    this.privacyManager = null;
+    this.currentStreamId = null;
+    this.initializePrivacyProtection();
+  }
+
+  /**
+   * Initialize privacy protection for audio processing
+   */
+  async initializePrivacyProtection() {
+    try {
+      if (typeof PrivacyManager !== 'undefined') {
+        this.privacyManager = new PrivacyManager();
+        await this.privacyManager.initializePrivacySettings();
+      } else {
+        console.warn('PrivacyManager not available, audio processing will continue without privacy protection');
+      }
+    } catch (error) {
+      console.error('Failed to initialize privacy protection:', error);
+    }
   }
 
   /**
@@ -22,6 +42,18 @@ class AudioProcessor {
    */
   async captureAudioFromVideo(videoElement, onAudioData, onError) {
     try {
+      // Request privacy consent for audio processing
+      if (this.privacyManager) {
+        const consentGranted = await this.privacyManager.requestConsent('audioProcessing', {
+          videoSource: videoElement.src || videoElement.currentSrc || 'unknown',
+          purpose: 'Real-time speech recognition for subtitle generation'
+        });
+
+        if (!consentGranted) {
+          throw new Error('User consent required for audio processing');
+        }
+      }
+
       this.videoElement = videoElement;
       this.onAudioDataCallback = onAudioData;
       this.onErrorCallback = onError;
@@ -29,6 +61,20 @@ class AudioProcessor {
       // Check if video has audio
       if (!this.hasAudioTrack(videoElement)) {
         throw new Error('Video element has no audio track');
+      }
+
+      // Register audio stream with privacy manager
+      if (this.privacyManager) {
+        this.currentStreamId = `audio_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+        const registered = this.privacyManager.registerAudioStream(this.currentStreamId, {
+          videoElement: videoElement.tagName,
+          source: videoElement.src || videoElement.currentSrc || 'unknown',
+          purpose: 'speech_recognition'
+        });
+
+        if (!registered) {
+          throw new Error('Failed to register audio stream for privacy compliance');
+        }
       }
 
       // Create audio context
@@ -57,7 +103,8 @@ class AudioProcessor {
   async createAudioContext() {
     try {
       // Create audio context with appropriate sample rate
-      this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      this.audioContext = new AudioContextClass({
         sampleRate: 16000, // Optimal for speech recognition
         latencyHint: 'interactive'
       });
@@ -164,11 +211,35 @@ class AudioProcessor {
     const bufferLength = this.analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
     const floatArray = new Float32Array(bufferLength);
+    
+    // Performance optimizations
+    let frameCount = 0;
+    let lastProcessTime = 0;
+    const PROCESSING_INTERVAL = 100; // Process every 100ms instead of every frame
+    const BATCH_SIZE = 5; // Process in batches to reduce overhead
+    
+    // Reuse objects to reduce garbage collection
+    const reusableAudioData = {
+      frequencyData: dataArray,
+      timeDomainData: floatArray,
+      audioLevel: 0,
+      timestamp: 0
+    };
 
-    const analyze = () => {
+    const analyze = (currentTime) => {
       if (!this.isProcessing) {
         return;
       }
+
+      frameCount++;
+      
+      // Throttle processing to reduce CPU usage
+      if (currentTime - lastProcessTime < PROCESSING_INTERVAL) {
+        requestAnimationFrame(analyze);
+        return;
+      }
+      
+      lastProcessTime = currentTime;
 
       // Get frequency and time domain data
       this.analyser.getByteFrequencyData(dataArray);
@@ -180,32 +251,64 @@ class AudioProcessor {
 
       // Send audio data to callback if voice activity detected
       if (hasVoiceActivity && this.onAudioDataCallback) {
-        this.onAudioDataCallback({
-          frequencyData: dataArray,
-          timeDomainData: floatArray,
-          audioLevel: audioLevel,
-          timestamp: Date.now()
-        });
+        // Update reusable object instead of creating new one
+        reusableAudioData.audioLevel = audioLevel;
+        reusableAudioData.timestamp = Date.now();
+
+        // Process audio data through privacy manager if available
+        if (this.privacyManager && this.currentStreamId) {
+          const privacyResult = this.privacyManager.processAudioDataSecurely(
+            this.currentStreamId, 
+            floatArray
+          );
+          
+          if (privacyResult) {
+            // Add privacy metadata to audio data
+            reusableAudioData.privacy = {
+              streamId: privacyResult.streamId,
+              processed: privacyResult.processed,
+              timestamp: privacyResult.timestamp
+            };
+          } else {
+            // Privacy processing failed, don't send audio data
+            console.warn('Audio data blocked by privacy protection');
+            requestAnimationFrame(analyze);
+            return;
+          }
+        }
+
+        this.onAudioDataCallback(reusableAudioData);
       }
 
       // Continue analysis
       requestAnimationFrame(analyze);
     };
 
-    analyze();
+    requestAnimationFrame(analyze);
   }
 
   /**
-   * Calculate overall audio level
+   * Calculate overall audio level (optimized)
    * @param {Uint8Array} frequencyData - Frequency domain data
    * @returns {number} - Audio level (0-1)
    */
   calculateAudioLevel(frequencyData) {
+    // Optimized calculation using only relevant frequency range for speech (300-3400 Hz)
+    const sampleRate = this.audioContext.sampleRate;
+    const nyquist = sampleRate / 2;
+    const binSize = nyquist / frequencyData.length;
+    
+    const startBin = Math.floor(300 / binSize);
+    const endBin = Math.min(Math.floor(3400 / binSize), frequencyData.length);
+    
     let sum = 0;
-    for (let i = 0; i < frequencyData.length; i++) {
+    const relevantBins = endBin - startBin;
+    
+    for (let i = startBin; i < endBin; i++) {
       sum += frequencyData[i];
     }
-    return sum / (frequencyData.length * 255);
+    
+    return relevantBins > 0 ? sum / (relevantBins * 255) : 0;
   }
 
   /**
@@ -232,20 +335,24 @@ class AudioProcessor {
   }
 
   /**
-   * Check if audio signal has voice-like characteristics
+   * Check if audio signal has voice-like characteristics (optimized)
    * @param {Float32Array} timeDomainData - Time domain audio data
    * @returns {boolean} - Whether signal appears to be voice
    */
   hasVoiceCharacteristics(timeDomainData) {
-    // Simple heuristic: voice typically has more variation than pure tones
+    // Optimized heuristic: sample every 4th point to reduce computation
+    const sampleStep = 4;
     let variations = 0;
-    for (let i = 1; i < timeDomainData.length; i++) {
-      if (Math.abs(timeDomainData[i] - timeDomainData[i - 1]) > 0.01) {
+    let sampledPoints = 0;
+    
+    for (let i = sampleStep; i < timeDomainData.length; i += sampleStep) {
+      if (Math.abs(timeDomainData[i] - timeDomainData[i - sampleStep]) > 0.01) {
         variations++;
       }
+      sampledPoints++;
     }
 
-    const variationRatio = variations / timeDomainData.length;
+    const variationRatio = sampledPoints > 0 ? variations / sampledPoints : 0;
     return variationRatio > 0.1; // Voice should have at least 10% variation
   }
 
@@ -274,6 +381,12 @@ class AudioProcessor {
    */
   stopProcessing() {
     this.isProcessing = false;
+
+    // Clean up privacy-related resources first
+    if (this.privacyManager && this.currentStreamId) {
+      this.privacyManager.unregisterDataStream(this.currentStreamId);
+      this.currentStreamId = null;
+    }
 
     if (this.mediaStreamSource) {
       this.mediaStreamSource.disconnect();

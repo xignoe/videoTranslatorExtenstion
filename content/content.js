@@ -21,6 +21,12 @@ class VideoTranslator {
     this.subtitleStyleManager = null;
     this.errorHandler = null;
     this.statusIndicator = null;
+    this.securityIsolation = null;
+    this.privacyManager = null;
+    
+    // Performance and resource management
+    this.performanceMonitor = null;
+    this.resourceManager = null;
     
     // Bind methods to preserve context
     this.handleVideoAdded = this.handleVideoAdded.bind(this);
@@ -74,6 +80,31 @@ class VideoTranslator {
    * Initialize all component instances
    */
   async initializeComponents() {
+    // Initialize performance monitoring and resource management first
+    if (typeof PerformanceMonitor !== 'undefined') {
+      this.performanceMonitor = new PerformanceMonitor();
+      this.performanceMonitor.startMonitoring();
+      console.log('Performance monitoring initialized');
+    }
+
+    if (typeof ResourceManager !== 'undefined') {
+      this.resourceManager = new ResourceManager();
+      console.log('Resource manager initialized');
+    }
+
+    // Initialize security isolation first for protection
+    if (typeof SecurityIsolation !== 'undefined') {
+      this.securityIsolation = new SecurityIsolation();
+      console.log('Security isolation initialized');
+    }
+
+    // Initialize privacy manager
+    if (typeof PrivacyManager !== 'undefined') {
+      this.privacyManager = new PrivacyManager();
+      await this.privacyManager.initializePrivacySettings();
+      console.log('Privacy manager initialized');
+    }
+
     // Initialize error handler first
     if (typeof ErrorHandler !== 'undefined') {
       this.errorHandler = new ErrorHandler();
@@ -737,6 +768,11 @@ class VideoTranslator {
     // Translate the transcript
     if (this.translationService && this.settings.targetLanguage) {
       try {
+        // Mark translation start for performance monitoring
+        if (this.performanceMonitor) {
+          this.performanceMonitor.markStart('translation');
+        }
+
         // Update status to show translation in progress
         if (this.statusIndicator) {
           this.statusIndicator.updateIndicatorStatus(activeVideoId, 'translating', {
@@ -745,11 +781,19 @@ class VideoTranslator {
           });
         }
 
+        const translationStartTime = performance.now();
         const translationResult = await this.translationService.translateText(
           result.transcript,
           this.settings.sourceLanguage || 'auto',
           this.settings.targetLanguage
         );
+        const translationEndTime = performance.now();
+
+        // Record translation performance
+        if (this.performanceMonitor) {
+          this.performanceMonitor.recordTranslationLatency(translationStartTime, translationEndTime);
+          this.performanceMonitor.markEnd('translation');
+        }
 
         this.handleTranslationResult(activeVideoId, translationResult);
 
@@ -805,11 +849,24 @@ class VideoTranslator {
 
     videoInstance.lastTranslation = translationResult;
 
-    // Display translated subtitle
+    // Display translated subtitle with performance monitoring
     if (this.subtitleRenderer && translationResult.translatedText) {
+      // Mark subtitle rendering start for performance monitoring
+      if (this.performanceMonitor) {
+        this.performanceMonitor.markStart('subtitle');
+      }
+
+      const subtitleStartTime = performance.now();
       this.subtitleRenderer.displaySubtitle(videoId, translationResult.translatedText, {
         duration: 5000
       });
+      const subtitleEndTime = performance.now();
+
+      // Record subtitle rendering performance
+      if (this.performanceMonitor) {
+        this.performanceMonitor.recordSubtitleRendering(subtitleStartTime, subtitleEndTime);
+        this.performanceMonitor.markEnd('subtitle');
+      }
     }
 
     // Update status indicator
@@ -1156,6 +1213,15 @@ class VideoTranslator {
    */
   cleanup() {
     console.log('Cleaning up VideoTranslator...');
+    
+    // Stop performance monitoring and resource management
+    if (this.performanceMonitor) {
+      this.performanceMonitor.stopMonitoring();
+    }
+    
+    if (this.resourceManager) {
+      this.resourceManager.cleanupAll();
+    }
     
     // Stop memory management
     this.stopMemoryManagement();

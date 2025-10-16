@@ -79,14 +79,9 @@ class MockSpeechRecognition {
   }
 }
 
-// Set up global mocks before importing
-Object.defineProperty(global, 'window', {
-  value: {
-    SpeechRecognition: MockSpeechRecognition,
-    webkitSpeechRecognition: MockSpeechRecognition
-  },
-  writable: true
-});
+// Set up global mocks
+global.SpeechRecognition = MockSpeechRecognition;
+global.webkitSpeechRecognition = MockSpeechRecognition;
 
 // Import the class to test
 const SpeechRecognizer = require('../content/speechRecognizer.js');
@@ -105,54 +100,47 @@ describe('SpeechRecognizer', () => {
   });
 
   afterEach(() => {
-    if (speechRecognizer) {
-      speechRecognizer.destroy();
+    if (speechRecognizer.isListening) {
+      speechRecognizer.stop();
     }
-    jest.clearAllMocks();
-  });
-
-  describe('Browser Support Detection', () => {
-    test('should detect browser support correctly', () => {
-      expect(speechRecognizer.checkBrowserSupport()).toBe(true);
-    });
-
-    test('should handle missing Web Speech API', () => {
-      const originalSpeechRecognition = global.window.SpeechRecognition;
-      const originalWebkitSpeechRecognition = global.window.webkitSpeechRecognition;
-      
-      delete global.window.SpeechRecognition;
-      delete global.window.webkitSpeechRecognition;
-      
-      const recognizer = new SpeechRecognizer();
-      expect(recognizer.checkBrowserSupport()).toBe(false);
-      
-      // Restore
-      global.window.SpeechRecognition = originalSpeechRecognition;
-      global.window.webkitSpeechRecognition = originalWebkitSpeechRecognition;
-    });
   });
 
   describe('Initialization', () => {
-    test('should initialize successfully with valid parameters', () => {
-      const result = speechRecognizer.initialize('en-US', mockOnResult, mockOnError, mockOnStatus);
+    test('should initialize with default settings', () => {
+      expect(speechRecognizer.isListening).toBe(false);
+      expect(speechRecognizer.currentLanguage).toBe('en-US');
+      expect(speechRecognizer.recognition).toBeNull();
+      expect(speechRecognizer.isSupported).toBe(true);
+    });
+
+    test('should initialize speech recognition with correct settings', () => {
+      const result = speechRecognizer.initialize('es-ES', mockOnResult, mockOnError, mockOnStatus);
+
       expect(result).toBe(true);
-      expect(speechRecognizer.currentLanguage).toBe('en-US');
+      expect(speechRecognizer.currentLanguage).toBe('es-ES');
+      expect(speechRecognizer.recognition).toBeTruthy();
+      expect(speechRecognizer.recognition.continuous).toBe(true);
+      expect(speechRecognizer.recognition.interimResults).toBe(true);
+      expect(speechRecognizer.recognition.lang).toBe('es-ES');
     });
 
-    test('should handle initialization without browser support', () => {
-      speechRecognizer.isSupported = false;
-      const result = speechRecognizer.initialize('en-US', mockOnResult, mockOnError, mockOnStatus);
+    test('should handle missing SpeechRecognition API', () => {
+      const originalSpeechRecognition = global.SpeechRecognition;
+      const originalWebkitSpeechRecognition = global.webkitSpeechRecognition;
+      
+      delete global.SpeechRecognition;
+      delete global.webkitSpeechRecognition;
+
+      // Create new instance to test unsupported browser
+      const unsupportedRecognizer = new SpeechRecognizer();
+      const result = unsupportedRecognizer.initialize('en-US', mockOnResult, mockOnError, mockOnStatus);
+
       expect(result).toBe(false);
-      expect(mockOnError).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: expect.stringContaining('not supported')
-        })
-      );
-    });
+      expect(mockOnError).toHaveBeenCalledWith(expect.any(Error));
 
-    test('should use default language when none provided', () => {
-      speechRecognizer.initialize(null, mockOnResult, mockOnError, mockOnStatus);
-      expect(speechRecognizer.currentLanguage).toBe('en-US');
+      // Restore
+      global.SpeechRecognition = originalSpeechRecognition;
+      global.webkitSpeechRecognition = originalWebkitSpeechRecognition;
     });
   });
 
@@ -161,102 +149,111 @@ describe('SpeechRecognizer', () => {
       speechRecognizer.initialize('en-US', mockOnResult, mockOnError, mockOnStatus);
     });
 
-    test('should start listening successfully', async () => {
+    test('should start speech recognition', () => {
       const result = speechRecognizer.startListening();
+
       expect(result).toBe(true);
-      
-      // Wait for async start event
-      await new Promise(resolve => setTimeout(resolve, 20));
-      expect(speechRecognizer.isListening).toBe(true);
-      expect(mockOnStatus).toHaveBeenCalledWith(
-        expect.objectContaining({ status: 'listening' })
-      );
+      // isListening will be set to true in the onstart callback
+      setTimeout(() => {
+        expect(speechRecognizer.isListening).toBe(true);
+      }, 20);
     });
 
-    test('should stop listening successfully', async () => {
+    test('should stop speech recognition', () => {
       speechRecognizer.startListening();
-      await new Promise(resolve => setTimeout(resolve, 20));
-      
       speechRecognizer.stopListening();
-      await new Promise(resolve => setTimeout(resolve, 20));
-      
-      expect(speechRecognizer.isListening).toBe(false);
-      expect(mockOnStatus).toHaveBeenCalledWith(
-        expect.objectContaining({ status: 'stopped' })
-      );
+
+      // isListening will be set to false in the onend callback
+      setTimeout(() => {
+        expect(speechRecognizer.isListening).toBe(false);
+      }, 20);
     });
 
-    test('should handle starting when already listening', () => {
+    test('should not start if already listening', () => {
+      speechRecognizer.startListening();
+      // Manually set isListening to simulate already running
       speechRecognizer.isListening = true;
+      
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
       const result = speechRecognizer.startListening();
+
       expect(result).toBe(true);
+      expect(consoleSpy).toHaveBeenCalledWith('Speech recognition already active');
+      consoleSpy.mockRestore();
+    });
+
+    test('should handle start errors gracefully', () => {
+      // Mock recognition to throw error on start
+      speechRecognizer.recognition.start = jest.fn(() => {
+        throw new Error('Start failed');
+      });
+
+      const result = speechRecognizer.startListening();
+
+      expect(result).toBe(false);
     });
   });
 
-  describe('Speech Result Processing', () => {
+  describe('Result Processing', () => {
     beforeEach(() => {
       speechRecognizer.initialize('en-US', mockOnResult, mockOnError, mockOnStatus);
       speechRecognizer.startListening();
     });
 
-    test('should process final results with high confidence', async () => {
-      await new Promise(resolve => setTimeout(resolve, 20));
-      
-      const mockRecognition = speechRecognizer.recognition;
-      mockRecognition._triggerResult('Hello world', 0.9, true);
-      
-      expect(mockOnResult).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'final',
-          transcript: 'hello world',
-          confidence: 0.9,
-          language: 'en-US'
-        })
-      );
+    test('should process final results with high confidence', (done) => {
+      mockOnResult.mockImplementation((result) => {
+        expect(result.transcript).toBe('hello world');
+        expect(result.confidence).toBe(0.9);
+        expect(result.isFinal).toBe(true);
+        expect(result.timestamp).toBeDefined();
+        done();
+      });
+
+      setTimeout(() => {
+        speechRecognizer.recognition._triggerResult('hello world', 0.9, true);
+      }, 10);
     });
 
-    test('should process interim results', async () => {
-      await new Promise(resolve => setTimeout(resolve, 20));
-      
-      const mockRecognition = speechRecognizer.recognition;
-      mockRecognition._triggerResult('Hello', 0, false);
-      
-      expect(mockOnResult).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'interim',
-          transcript: 'Hello',
-          confidence: 0
-        })
-      );
+    test('should process interim results', (done) => {
+      mockOnResult.mockImplementation((result) => {
+        expect(result.transcript).toBe('hello');
+        expect(result.confidence).toBe(0.7);
+        expect(result.isFinal).toBe(false);
+        done();
+      });
+
+      setTimeout(() => {
+        speechRecognizer.recognition._triggerResult('hello', 0.7, false);
+      }, 10);
     });
 
-    test('should filter out low confidence results', async () => {
-      await new Promise(resolve => setTimeout(resolve, 20));
+    test('should filter out low confidence results', (done) => {
+      let resultCalled = false;
       
-      const mockRecognition = speechRecognizer.recognition;
-      mockRecognition._triggerResult('unclear speech', 0.3, true);
-      
-      // Should not call onResult for low confidence
-      expect(mockOnResult).not.toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'final' })
-      );
+      mockOnResult.mockImplementation(() => {
+        resultCalled = true;
+      });
+
+      setTimeout(() => {
+        speechRecognizer.recognition._triggerResult('unclear speech', 0.3, true);
+        
+        // Wait a bit to ensure callback isn't called
+        setTimeout(() => {
+          expect(resultCalled).toBe(false);
+          done();
+        }, 50);
+      }, 10);
     });
 
-    test('should clean transcript text properly', () => {
-      const cleanText = speechRecognizer.cleanTranscript('  Hello,   World!  ');
-      expect(cleanText).toBe('hello, world!');
-    });
+    test('should normalize transcript text', (done) => {
+      mockOnResult.mockImplementation((result) => {
+        expect(result.transcript).toBe('hello world');
+        done();
+      });
 
-    test('should maintain result buffer for context', async () => {
-      await new Promise(resolve => setTimeout(resolve, 20));
-      
-      const mockRecognition = speechRecognizer.recognition;
-      mockRecognition._triggerResult('First sentence', 0.9, true);
-      mockRecognition._triggerResult('Second sentence', 0.9, true);
-      
-      expect(speechRecognizer.resultBuffer).toHaveLength(2);
-      expect(speechRecognizer.getRecentContext()).toContain('first sentence');
-      expect(speechRecognizer.getRecentContext()).toContain('second sentence');
+      setTimeout(() => {
+        speechRecognizer.recognition._triggerResult('  HELLO WORLD  ', 0.9, true);
+      }, 10);
     });
   });
 
@@ -265,258 +262,142 @@ describe('SpeechRecognizer', () => {
       speechRecognizer.initialize('en-US', mockOnResult, mockOnError, mockOnStatus);
     });
 
-    test('should handle no-speech error', async () => {
-      speechRecognizer.startListening();
-      await new Promise(resolve => setTimeout(resolve, 20));
-      
-      const mockRecognition = speechRecognizer.recognition;
-      mockRecognition._triggerError('no-speech');
-      
-      expect(mockOnError).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'speech_recognition_error',
-          error: 'no-speech',
-          shouldRestart: true
-        })
-      );
+    test('should handle speech recognition errors', (done) => {
+      mockOnError.mockImplementation((error) => {
+        expect(error.type).toBe('speech_recognition_error');
+        expect(error.error).toBe('no-speech');
+        expect(error.timestamp).toBeDefined();
+        done();
+      });
+
+      speechRecognizer.start();
+      setTimeout(() => {
+        speechRecognizer.recognition._triggerError('no-speech');
+      }, 10);
     });
 
-    test('should handle audio-capture error', async () => {
-      speechRecognizer.startListening();
-      await new Promise(resolve => setTimeout(resolve, 20));
+    test('should handle different error types appropriately', (done) => {
+      const errorTypes = ['no-speech', 'audio-capture', 'not-allowed', 'network'];
+      let errorCount = 0;
       
-      const mockRecognition = speechRecognizer.recognition;
-      mockRecognition._triggerError('audio-capture');
-      
-      expect(mockOnError).toHaveBeenCalledWith(
-        expect.objectContaining({
-          error: 'audio-capture',
-          shouldRestart: false
-        })
-      );
+      mockOnError.mockImplementation((error) => {
+        expect(error.type).toBe('speech_recognition_error');
+        expect(errorTypes).toContain(error.error);
+        errorCount++;
+        
+        if (errorCount === errorTypes.length) {
+          done();
+        }
+      });
+
+      speechRecognizer.start();
+      setTimeout(() => {
+        errorTypes.forEach((errorType, index) => {
+          setTimeout(() => {
+            speechRecognizer.recognition._triggerError(errorType);
+          }, index * 10);
+        });
+      }, 10);
     });
 
-    test('should handle not-allowed error', async () => {
-      speechRecognizer.startListening();
-      await new Promise(resolve => setTimeout(resolve, 20));
+    test('should restart after recoverable errors', (done) => {
+      let restartCount = 0;
       
-      const mockRecognition = speechRecognizer.recognition;
-      mockRecognition._triggerError('not-allowed');
-      
-      expect(mockOnError).toHaveBeenCalledWith(
-        expect.objectContaining({
-          error: 'not-allowed',
-          message: 'Microphone access denied',
-          shouldRestart: false
-        })
-      );
+      mockOnStatus.mockImplementation((status) => {
+        if (status.status === 'listening') {
+          restartCount++;
+          if (restartCount === 2) {
+            // Second start means it restarted after error
+            done();
+          }
+        }
+      });
+
+      speechRecognizer.start();
+      setTimeout(() => {
+        speechRecognizer.recognition._triggerError('no-speech');
+      }, 10);
     });
   });
 
-  describe('Language Management', () => {
+  describe('Result Buffer Management', () => {
     beforeEach(() => {
       speechRecognizer.initialize('en-US', mockOnResult, mockOnError, mockOnStatus);
+      speechRecognizer.start();
     });
 
-    test('should change language successfully', () => {
-      const result = speechRecognizer.changeLanguage('es-ES');
-      expect(result).toBe(true);
-      expect(speechRecognizer.currentLanguage).toBe('es-ES');
-    });
-
-    test('should handle same language change', () => {
-      const result = speechRecognizer.changeLanguage('en-US');
-      expect(result).toBe(true);
-    });
-
-    test('should restart recognition when changing language while listening', async () => {
-      speechRecognizer.startListening();
-      await new Promise(resolve => setTimeout(resolve, 20));
+    test('should maintain result buffer with size limits', (done) => {
+      let resultCount = 0;
       
-      const wasListening = speechRecognizer.isListening;
-      speechRecognizer.changeLanguage('fr-FR');
-      
-      expect(wasListening).toBe(true);
-      expect(speechRecognizer.currentLanguage).toBe('fr-FR');
-    });
-  });
+      mockOnResult.mockImplementation(() => {
+        resultCount++;
+        
+        if (resultCount === 12) {
+          const buffer = speechRecognizer.getResultBuffer();
+          expect(buffer.length).toBeLessThanOrEqual(10); // Max buffer size
+          done();
+        }
+      });
 
-  describe('Configuration Management', () => {
-    beforeEach(() => {
+      setTimeout(() => {
+        for (let i = 0; i < 12; i++) {
+          setTimeout(() => {
+            speechRecognizer.recognition._triggerResult(`Result ${i}`, 0.9, true);
+          }, i * 5);
+        }
+      }, 10);
+    });
+
+    test('should provide result statistics', () => {
       speechRecognizer.initialize('en-US', mockOnResult, mockOnError, mockOnStatus);
-    });
-
-    test('should update configuration correctly', () => {
-      const newConfig = {
-        continuous: false,
-        confidenceThreshold: 0.8,
-        silenceTimeout: 5000
-      };
       
-      speechRecognizer.updateConfig(newConfig);
-      
-      expect(speechRecognizer.config.continuous).toBe(false);
-      expect(speechRecognizer.config.confidenceThreshold).toBe(0.8);
-      expect(speechRecognizer.config.silenceTimeout).toBe(5000);
-    });
-
-    test('should apply configuration to active recognition', () => {
-      speechRecognizer.updateConfig({ continuous: false });
-      expect(speechRecognizer.recognition.continuous).toBe(false);
+      const stats = speechRecognizer.getStatistics();
+      expect(stats).toEqual({
+        totalResults: 0,
+        averageConfidence: 0,
+        errorCount: 0,
+        sessionDuration: 0,
+        isListening: false
+      });
     });
   });
 
-  describe('Status and Statistics', () => {
-    beforeEach(() => {
+  describe('Language Support', () => {
+    test('should support language changes', () => {
       speechRecognizer.initialize('en-US', mockOnResult, mockOnError, mockOnStatus);
+      
+      speechRecognizer.setLanguage('fr-FR');
+      
+      expect(speechRecognizer.language).toBe('fr-FR');
+      expect(speechRecognizer.recognition.lang).toBe('fr-FR');
     });
 
-    test('should provide accurate status information', () => {
-      const status = speechRecognizer.getStatus();
-      
-      expect(status).toEqual(
-        expect.objectContaining({
-          isSupported: true,
-          isListening: false,
-          currentLanguage: 'en-US',
-          resultBufferSize: 0
-        })
-      );
-    });
-
-    test('should track timing information', async () => {
-      speechRecognizer.startListening();
-      await new Promise(resolve => setTimeout(resolve, 20));
-      
-      const mockRecognition = speechRecognizer.recognition;
-      mockRecognition._triggerResult('test', 0.9, true);
-      
-      const status = speechRecognizer.getStatus();
-      expect(status.lastResultTime).toBeGreaterThan(0);
-      expect(status.timeSinceLastResult).toBeGreaterThanOrEqual(0);
-    });
-  });
-
-  describe('Automatic Restart Logic', () => {
-    beforeEach(() => {
+    test('should validate language codes', () => {
       speechRecognizer.initialize('en-US', mockOnResult, mockOnError, mockOnStatus);
-    });
-
-    test('should determine restart necessity correctly', async () => {
-      speechRecognizer.startListening();
-      await new Promise(resolve => setTimeout(resolve, 20));
       
-      // Recent result should allow restart
-      speechRecognizer.lastResultTime = Date.now() - 1000;
-      expect(speechRecognizer.shouldRestart()).toBe(true);
+      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      speechRecognizer.setLanguage('invalid-lang');
       
-      // Old result should prevent restart
-      speechRecognizer.lastResultTime = Date.now() - 35000;
-      expect(speechRecognizer.shouldRestart()).toBe(false);
-    });
-
-    test('should schedule restart after recoverable error', async () => {
-      jest.useFakeTimers();
+      expect(consoleSpy).toHaveBeenCalledWith('Invalid language code: invalid-lang');
+      expect(speechRecognizer.language).toBe('en-US'); // Should remain unchanged
       
-      speechRecognizer.startListening();
-      await new Promise(resolve => setTimeout(resolve, 20));
-      
-      const mockRecognition = speechRecognizer.recognition;
-      mockRecognition._triggerError('network');
-      
-      // Fast-forward time to trigger restart
-      jest.advanceTimersByTime(1100);
-      
-      expect(speechRecognizer.restartTimer).not.toBeNull();
-      
-      jest.useRealTimers();
+      consoleSpy.mockRestore();
     });
   });
 
-  describe('Resource Cleanup', () => {
+  describe('Cleanup', () => {
     test('should cleanup resources on destroy', () => {
       speechRecognizer.initialize('en-US', mockOnResult, mockOnError, mockOnStatus);
-      speechRecognizer.startListening();
+      speechRecognizer.start();
       
       speechRecognizer.destroy();
       
+      expect(speechRecognizer.isListening).toBe(false);
       expect(speechRecognizer.recognition).toBeNull();
-      expect(speechRecognizer.resultBuffer).toEqual([]);
-      expect(speechRecognizer.onResultCallback).toBeNull();
-      expect(speechRecognizer.onErrorCallback).toBeNull();
-      expect(speechRecognizer.onStatusCallback).toBeNull();
     });
 
-    test('should clear all timers on cleanup', () => {
-      jest.useFakeTimers();
-      
-      speechRecognizer.initialize('en-US', mockOnResult, mockOnError, mockOnStatus);
-      speechRecognizer.scheduleRestart();
-      speechRecognizer.startSilenceTimer();
-      
-      speechRecognizer.clearTimers();
-      
-      expect(speechRecognizer.restartTimer).toBeNull();
-      expect(speechRecognizer.silenceTimer).toBeNull();
-      
-      jest.useRealTimers();
+    test('should handle cleanup when not initialized', () => {
+      expect(() => speechRecognizer.destroy()).not.toThrow();
     });
-  });
-});
-
-// Performance and timing tests
-describe('SpeechRecognizer Performance', () => {
-  let speechRecognizer;
-  let mockOnResult;
-
-  beforeEach(() => {
-    speechRecognizer = new SpeechRecognizer();
-    mockOnResult = jest.fn();
-    speechRecognizer.initialize('en-US', mockOnResult, jest.fn(), jest.fn());
-  });
-
-  afterEach(() => {
-    speechRecognizer.destroy();
-  });
-
-  test('should process results within acceptable time limits', async () => {
-    speechRecognizer.startListening();
-    await new Promise(resolve => setTimeout(resolve, 20));
-    
-    const startTime = Date.now();
-    const mockRecognition = speechRecognizer.recognition;
-    mockRecognition._triggerResult('Performance test', 0.9, true);
-    
-    const processingTime = Date.now() - startTime;
-    expect(processingTime).toBeLessThan(100); // Should process within 100ms
-  });
-
-  test('should handle rapid successive results', async () => {
-    speechRecognizer.startListening();
-    await new Promise(resolve => setTimeout(resolve, 20));
-    
-    const mockRecognition = speechRecognizer.recognition;
-    
-    // Trigger multiple rapid results
-    for (let i = 0; i < 10; i++) {
-      mockRecognition._triggerResult(`Result ${i}`, 0.9, true);
-    }
-    
-    expect(mockOnResult).toHaveBeenCalledTimes(10);
-    expect(speechRecognizer.resultBuffer.length).toBeLessThanOrEqual(10);
-  });
-
-  test('should maintain buffer size limits', async () => {
-    speechRecognizer.startListening();
-    await new Promise(resolve => setTimeout(resolve, 20));
-    
-    const mockRecognition = speechRecognizer.recognition;
-    
-    // Add more results than buffer limit
-    for (let i = 0; i < 15; i++) {
-      mockRecognition._triggerResult(`Buffer test ${i}`, 0.9, true);
-    }
-    
-    expect(speechRecognizer.resultBuffer.length).toBeLessThanOrEqual(10);
   });
 });

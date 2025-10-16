@@ -13,6 +13,9 @@ class TranslationService {
     this.maxRetries = 3;
     this.retryDelayBase = 1000; // Base retry delay in ms
     this.maxRetryDelay = 30000; // Maximum retry delay in ms
+    this.privacyManager = null;
+    this.dataProtection = null;
+    this.initializePrivacyProtection();
     this.providers = {
       google: {
         name: 'Google Translate',
@@ -32,6 +35,28 @@ class TranslationService {
     this.currentProvider = 'google';
     this.resetRateLimitCounters();
     this.startQueueProcessor();
+  }
+
+  /**
+   * Initialize privacy protection for translation service
+   */
+  async initializePrivacyProtection() {
+    try {
+      if (typeof PrivacyManager !== 'undefined') {
+        this.privacyManager = new PrivacyManager();
+        await this.privacyManager.initializePrivacySettings();
+      }
+      
+      if (typeof DataProtection !== 'undefined') {
+        this.dataProtection = new DataProtection();
+      }
+      
+      if (!this.privacyManager || !this.dataProtection) {
+        console.warn('Privacy protection not fully available for translation service');
+      }
+    } catch (error) {
+      console.error('Failed to initialize privacy protection for translation service:', error);
+    }
   }
 
   /**
@@ -118,18 +143,35 @@ class TranslationService {
       throw new Error('Google Translate rate limit exceeded');
     }
 
+    // Create secure translation request
+    let requestText = text;
+    if (this.privacyManager) {
+      const secureRequest = this.privacyManager.createSecureTranslationRequest(text, {
+        sourceLanguage,
+        targetLanguage,
+        provider: 'google'
+      });
+      
+      if (!secureRequest) {
+        throw new Error('Failed to create secure translation request');
+      }
+      
+      requestText = secureRequest.text;
+    }
+
     const params = new URLSearchParams({
       client: 'gtx',
       sl: sourceLanguage,
       tl: targetLanguage,
       dt: 't',
-      q: text
+      q: requestText
     });
 
     const response = await fetch(`${provider.endpoint}?${params}`, {
       method: 'GET',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; VideoTranslator/1.0)'
+        'User-Agent': 'Mozilla/5.0 (compatible; VideoTranslator/1.0)',
+        'X-Privacy-Protected': 'true'
       }
     });
 
@@ -163,13 +205,30 @@ class TranslationService {
       throw new Error('LibreTranslate rate limit exceeded');
     }
 
+    // Create secure translation request
+    let requestText = text;
+    if (this.privacyManager) {
+      const secureRequest = this.privacyManager.createSecureTranslationRequest(text, {
+        sourceLanguage,
+        targetLanguage,
+        provider: 'libre'
+      });
+      
+      if (!secureRequest) {
+        throw new Error('Failed to create secure translation request');
+      }
+      
+      requestText = secureRequest.text;
+    }
+
     const response = await fetch(provider.endpoint, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'X-Privacy-Protected': 'true'
       },
       body: JSON.stringify({
-        q: text,
+        q: requestText,
         source: sourceLanguage,
         target: targetLanguage,
         format: 'text'
@@ -200,27 +259,72 @@ class TranslationService {
    * Main translation method with provider fallback
    */
   async translateText(text, sourceLanguage = 'auto', targetLanguage = 'en', options = {}) {
-    // Input validation
-    if (!text || typeof text !== 'string' || text.trim().length === 0) {
-      throw new Error('Invalid text input for translation');
-    }
+    try {
+      // Privacy and security validation
+      if (this.dataProtection) {
+        const validation = this.dataProtection.validateTextInput(text);
+        if (!validation.isValid) {
+          throw new Error(`Text validation failed: ${validation.errors.join(', ')}`);
+        }
+        
+        // Use sanitized text
+        text = validation.sanitizedText;
+        
+        // Log warnings if any
+        if (validation.warnings.length > 0) {
+          console.warn('Translation text validation warnings:', validation.warnings);
+        }
+      }
 
-    if (!targetLanguage || targetLanguage === sourceLanguage) {
-      return {
-        translatedText: text,
-        confidence: 1.0,
-        provider: 'none',
-        cached: false
-      };
-    }
+      // Request consent for data transmission
+      if (this.privacyManager) {
+        const consentGranted = await this.privacyManager.requestConsent('dataTransmission', {
+          textLength: text.length,
+          sourceLanguage,
+          targetLanguage,
+          purpose: 'Text translation for subtitle generation'
+        });
 
-    // Use queue system for better reliability and rate limiting
-    if (options.useQueue !== false) {
-      return this.queueTranslationRequest(text, sourceLanguage, targetLanguage, options);
-    }
+        if (!consentGranted) {
+          throw new Error('User consent required for translation service');
+        }
+      }
 
-    // Direct translation (legacy mode)
-    return this.translateDirectly(text, sourceLanguage, targetLanguage);
+      // Input validation
+      if (!text || typeof text !== 'string' || text.trim().length === 0) {
+        throw new Error('Invalid text input for translation');
+      }
+
+      if (!targetLanguage || targetLanguage === sourceLanguage) {
+        return {
+          translatedText: text,
+          confidence: 1.0,
+          provider: 'none',
+          cached: false
+        };
+      }
+
+      // Validate language codes
+      if (this.dataProtection) {
+        if (!this.dataProtection.validateLanguageCode(targetLanguage)) {
+          throw new Error(`Invalid target language code: ${targetLanguage}`);
+        }
+        if (sourceLanguage !== 'auto' && !this.dataProtection.validateLanguageCode(sourceLanguage)) {
+          throw new Error(`Invalid source language code: ${sourceLanguage}`);
+        }
+      }
+
+      // Use queue system for better reliability and rate limiting
+      if (options.useQueue !== false) {
+        return this.queueTranslationRequest(text, sourceLanguage, targetLanguage, options);
+      }
+
+      // Direct translation (legacy mode)
+      return this.translateDirectly(text, sourceLanguage, targetLanguage);
+    } catch (error) {
+      console.error('Translation request failed:', error);
+      throw error;
+    }
   }
 
   /**
