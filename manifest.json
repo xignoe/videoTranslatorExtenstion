@@ -24,19 +24,12 @@
     {
       "matches": ["<all_urls>"],
       "js": [
-        "content/dataProtection.js",
-        "content/privacyManager.js",
-        "content/securityIsolation.js",
         "content/errorHandler.js",
-        "content/statusIndicator.js",
         "content/videoDetector.js",
         "content/audioProcessor.js",
         "content/speechRecognizer.js",
         "content/translationService.js",
-        "content/subtitleStyleManager.js",
         "content/subtitleRenderer.js",
-        "content/subtitleTimer.js",
-        "content/audioSpeechIntegration.js",
         "content/content.js"
       ],
       "run_at": "document_end"

@@ -1,7 +1,9 @@
 // Popup script for Video Translator extension
 document.addEventListener('DOMContentLoaded', function() {
+  const sourceLanguageSelect = document.getElementById('sourceLanguage');
   const targetLanguageSelect = document.getElementById('targetLanguage');
   const extensionEnabledToggle = document.getElementById('extensionEnabled');
+  const requestMicrophoneButton = document.getElementById('requestMicrophone');
   const openOptionsButton = document.getElementById('openOptions');
   const refreshStatusButton = document.getElementById('refreshStatus');
   const statusDot = document.getElementById('statusDot');
@@ -11,7 +13,10 @@ document.addEventListener('DOMContentLoaded', function() {
   const currentDomainElement = document.getElementById('currentDomain');
 
   // Load saved settings
-  chrome.storage.sync.get(['targetLanguage', 'extensionEnabled'], function(result) {
+  chrome.storage.sync.get(['sourceLanguage', 'targetLanguage', 'extensionEnabled'], function(result) {
+    if (result.sourceLanguage) {
+      sourceLanguageSelect.value = result.sourceLanguage;
+    }
     if (result.targetLanguage) {
       targetLanguageSelect.value = result.targetLanguage;
     }
@@ -24,6 +29,20 @@ document.addEventListener('DOMContentLoaded', function() {
     checkCurrentTabStatus();
   });
 
+  // Save source language when changed
+  sourceLanguageSelect.addEventListener('change', function() {
+    const newLanguage = sourceLanguageSelect.value;
+    chrome.storage.sync.set({
+      sourceLanguage: newLanguage
+    });
+    
+    // Notify content scripts of language change
+    notifyContentScripts('languageChanged', { 
+      sourceLanguage: newLanguage,
+      targetLanguage: targetLanguageSelect.value
+    });
+  });
+
   // Save target language when changed
   targetLanguageSelect.addEventListener('change', function() {
     const newLanguage = targetLanguageSelect.value;
@@ -32,7 +51,10 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Notify content scripts of language change
-    notifyContentScripts('languageChanged', { targetLanguage: newLanguage });
+    notifyContentScripts('languageChanged', { 
+      sourceLanguage: sourceLanguageSelect.value,
+      targetLanguage: newLanguage
+    });
   });
 
   // Save extension enabled state when toggled
@@ -47,6 +69,26 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Notify content scripts of state change
     notifyContentScripts('extensionToggled', { enabled: isEnabled });
+  });
+
+  // Request microphone permission
+  requestMicrophoneButton.addEventListener('click', function() {
+    // Send message to content script to request microphone permission
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+      if (tabs[0]) {
+        chrome.tabs.sendMessage(tabs[0].id, {
+          action: 'requestMicrophonePermission'
+        }, function(response) {
+          if (response && response.success) {
+            requestMicrophoneButton.textContent = '✅ Microphone Enabled';
+            requestMicrophoneButton.disabled = true;
+            statusText.textContent = 'Microphone access granted';
+          } else {
+            statusText.textContent = 'Microphone access denied';
+          }
+        });
+      }
+    });
   });
 
   // Open options page

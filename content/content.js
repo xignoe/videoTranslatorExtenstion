@@ -1414,6 +1414,24 @@ function setupMessageListeners() {
         });
         break;
         
+      case 'requestMicrophonePermission':
+        handleMicrophonePermissionRequest(sendResponse);
+        return true; // Keep message channel open for async response
+        
+      case 'languageChanged':
+        if (request.data) {
+          handleLanguageChanged(request.data);
+        }
+        sendResponse({ success: true });
+        break;
+        
+      case 'extensionToggled':
+        if (request.data) {
+          handleExtensionToggled(request.data.enabled);
+        }
+        sendResponse({ success: true });
+        break;
+        
       default:
         console.warn('Unknown message action:', request.action);
         sendResponse({ error: 'Unknown action' });
@@ -1443,6 +1461,67 @@ async function handleSettingsChanged(newSettings) {
       state: 'settings-updated',
       message: 'Settings applied'
     });
+  }
+}
+
+// Handle microphone permission request
+async function handleMicrophonePermissionRequest(sendResponse) {
+  try {
+    // Request microphone access by trying to create an audio context and get user media
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    
+    // Stop the stream immediately - we just needed permission
+    stream.getTracks().forEach(track => track.stop());
+    
+    console.log('[VideoTranslator] Microphone permission granted');
+    sendResponse({ success: true, message: 'Microphone access granted' });
+    
+    // Try to initialize the extension if it's not already running
+    if (!videoTranslator || !videoTranslator.isInitialized) {
+      const settings = await new Promise(resolve => {
+        chrome.storage.sync.get(['sourceLanguage', 'targetLanguage', 'extensionEnabled'], resolve);
+      });
+      
+      if (settings.extensionEnabled !== false) {
+        await startExtension({
+          sourceLanguage: settings.sourceLanguage || 'auto',
+          targetLanguage: settings.targetLanguage || 'en',
+          extensionEnabled: true
+        });
+      }
+    }
+    
+  } catch (error) {
+    console.error('[VideoTranslator] Microphone permission denied:', error);
+    sendResponse({ success: false, message: 'Microphone access denied: ' + error.message });
+  }
+}
+
+// Handle language changes from popup
+function handleLanguageChanged(data) {
+  if (videoTranslator && videoTranslator.isInitialized) {
+    videoTranslator.updateSettings({
+      sourceLanguage: data.sourceLanguage || 'auto',
+      targetLanguage: data.targetLanguage || 'en'
+    });
+    console.log('[VideoTranslator] Languages updated:', data);
+  }
+}
+
+// Handle extension toggle from popup
+async function handleExtensionToggled(enabled) {
+  if (enabled && (!videoTranslator || !videoTranslator.isInitialized)) {
+    const settings = await new Promise(resolve => {
+      chrome.storage.sync.get(['sourceLanguage', 'targetLanguage'], resolve);
+    });
+    
+    await startExtension({
+      sourceLanguage: settings.sourceLanguage || 'auto',
+      targetLanguage: settings.targetLanguage || 'en',
+      extensionEnabled: true
+    });
+  } else if (!enabled && videoTranslator && videoTranslator.isInitialized) {
+    stopExtension();
   }
 }
 

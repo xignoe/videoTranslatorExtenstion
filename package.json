@@ -12,7 +12,10 @@
     "test:compatibility": "node test-compatibility.js",
     "test:all": "npm run test && npm run test:compatibility",
     "prepare:release": "npm run test:all && npm run build:production",
-    "validate": "node test-compatibility.js"
+    "validate": "node test-compatibility.js",
+    "dev:setup": "node setup-dev.js",
+    "dev:restore": "node setup-dev.js --restore",
+    "dev:icons": "node create-dev-icons.js"
   },
   "devDependencies": {
     "jest": "^29.7.0",

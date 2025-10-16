@@ -103,7 +103,7 @@ class AudioProcessor {
   async createAudioContext() {
     try {
       // Create audio context with appropriate sample rate
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       this.audioContext = new AudioContextClass({
         sampleRate: 16000, // Optimal for speech recognition
         latencyHint: 'interactive'

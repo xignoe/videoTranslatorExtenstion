@@ -18,6 +18,33 @@
     
     <main>
       <div class="control-section">
+        <label for="sourceLanguage">Translate from:</label>
+        <select id="sourceLanguage">
+          <option value="auto">Auto-detect</option>
+          <option value="es">Spanish</option>
+          <option value="en">English</option>
+          <option value="fr">French</option>
+          <option value="de">German</option>
+          <option value="it">Italian</option>
+          <option value="pt">Portuguese</option>
+          <option value="ru">Russian</option>
+          <option value="ja">Japanese</option>
+          <option value="ko">Korean</option>
+          <option value="zh">Chinese (Simplified)</option>
+          <option value="zh-TW">Chinese (Traditional)</option>
+          <option value="ar">Arabic</option>
+          <option value="hi">Hindi</option>
+          <option value="nl">Dutch</option>
+          <option value="sv">Swedish</option>
+          <option value="no">Norwegian</option>
+          <option value="da">Danish</option>
+          <option value="fi">Finnish</option>
+          <option value="pl">Polish</option>
+          <option value="tr">Turkish</option>
+        </select>
+      </div>
+      
+      <div class="control-section">
         <label for="targetLanguage">Translate to:</label>
         <select id="targetLanguage">
           <option value="en">English</option>
@@ -49,6 +76,12 @@
           <span class="slider"></span>
           <span class="toggle-label">Extension Enabled</span>
         </label>
+      </div>
+      
+      <div class="control-section">
+        <button id="requestMicrophone" class="primary-button">
+          🎤 Enable Microphone Access
+        </button>
       </div>
       
       <div class="control-section">
