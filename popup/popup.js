@@ -21,15 +21,17 @@ function describe(session) {
     }
     case 'listening': {
       const code = session.detail?.detectedLanguage;
+      const cpu = session.detail?.backend === 'wasm' ? ' · CPU mode' : '';
       if (code) {
+        let name = `"${code}"`;
         try {
-          const name = new Intl.DisplayNames(['en'], { type: 'language' }).of(code);
-          return `Live — ${name} detected`;
+          name = new Intl.DisplayNames(['en'], { type: 'language' }).of(code);
         } catch (e) {
-          return `Live — "${code}" detected`;
+          // keep the raw code
         }
+        return `Live — ${name} detected${cpu}`;
       }
-      return 'Live — captions on';
+      return `Live — captions on${cpu}`;
     }
     case 'error':
       return session.detail || 'Something went wrong';

@@ -25,12 +25,15 @@ const MODELS = {
 };
 
 const WHISPER_SAMPLE_RATE = 16000;
-const MIN_CHUNK_SECONDS = 5; // transcribe once this much audio is buffered
-const MAX_CHUNK_SECONDS = 28; // Whisper's window is 30s; never exceed it
+const MIN_CHUNK_SECONDS = 3; // shortest chunk worth transcribing
+const MAX_CHUNK_SECONDS = 8; // force a cut during continuous speech
+const BUFFER_CAP_SECONDS = 28; // Whisper's window is 30s; never exceed it
 const SILENCE_RMS = 0.0015; // skip chunks quieter than this
+const PAUSE_WINDOW_S = 0.35; // a quiet tail this long marks a pause
 
 let transcriber = null;
 let loadedModelKey = null;
+let backend = null; // 'webgpu' | 'wasm'
 let session = null; // active capture session, or null
 
 function send(message) {
@@ -68,6 +71,7 @@ async function loadModel(modelKey) {
       dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' },
       progress_callback
     });
+    backend = 'webgpu';
   } catch (webgpuError) {
     console.warn('WebGPU unavailable, falling back to WASM:', webgpuError);
     if (!crossOriginIsolated) env.backends.onnx.wasm.numThreads = 1;
@@ -76,6 +80,7 @@ async function loadModel(modelKey) {
       dtype: 'q8',
       progress_callback
     });
+    backend = 'wasm';
   }
   loadedModelKey = key;
 }
@@ -114,8 +119,11 @@ async function start(message) {
   session = {
     tabId: message.tabId,
     targetLanguage: message.targetLanguage || 'en',
-    // null = not known yet; detected from the first audible chunk
     language: sourceLanguage === 'auto' ? null : sourceLanguage,
+    // Auto-detection keeps voting on every chunk until two consecutive
+    // chunks agree; a manual choice is locked from the start.
+    langLocked: sourceLanguage !== 'auto',
+    langVotes: [],
     media,
     ctx,
     buffer: [],
@@ -125,7 +133,7 @@ async function start(message) {
   };
 
   recorder.port.onmessage = (event) => onAudio(event.data);
-  reportStatus('listening');
+  reportStatus('listening', { backend });
 }
 
 async function stop() {
@@ -142,17 +150,37 @@ function onAudio(samples) {
   session.buffered += samples.length;
 
   // If transcription can't keep up, drop the oldest audio.
-  const max = MAX_CHUNK_SECONDS * session.ctx.sampleRate;
-  while (session.buffered > max && session.buffer.length > 1) {
+  const cap = BUFFER_CAP_SECONDS * session.ctx.sampleRate;
+  while (session.buffered > cap && session.buffer.length > 1) {
     session.buffered -= session.buffer.shift().length;
   }
   maybeTranscribe();
+}
+
+/**
+ * True when the most recent PAUSE_WINDOW_S of audio is quiet — a natural
+ * pause. Cutting chunks there instead of mid-word noticeably improves
+ * Whisper's accuracy.
+ */
+function tailIsQuiet(s) {
+  const needed = Math.round(PAUSE_WINDOW_S * s.ctx.sampleRate);
+  let collected = 0;
+  let sum = 0;
+  for (let i = s.buffer.length - 1; i >= 0 && collected < needed; i--) {
+    const piece = s.buffer[i];
+    const take = Math.min(piece.length, needed - collected);
+    for (let j = piece.length - take; j < piece.length; j++) sum += piece[j] * piece[j];
+    collected += take;
+  }
+  return collected > 0 && Math.sqrt(sum / collected) < SILENCE_RMS * 1.5;
 }
 
 async function maybeTranscribe() {
   const s = session;
   if (!s || s.transcribing) return;
   if (s.buffered < MIN_CHUNK_SECONDS * s.ctx.sampleRate) return;
+  // Prefer cutting at a pause; force a cut if speech runs long.
+  if (s.buffered < MAX_CHUNK_SECONDS * s.ctx.sampleRate && !tailIsQuiet(s)) return;
 
   s.transcribing = true;
   const samples = new Float32Array(s.buffered);
@@ -182,25 +210,45 @@ async function processChunk(s, samples) {
   if (rms(audio) < SILENCE_RMS) return;
 
   // transformers.js does not auto-detect language (omitting it forces
-  // English), so detect once from the first audible chunk.
-  if (!s.language) {
+  // English), so detect it ourselves. A single early detection is easily
+  // fooled by intro music, so keep voting on each audible chunk until two
+  // consecutive chunks agree.
+  if (!s.langLocked) {
     try {
-      s.language = await detectLanguage(audio);
-      reportStatus('listening', { detectedLanguage: s.language });
+      const detected = await detectLanguage(audio);
+      s.langVotes.push(detected);
+      const n = s.langVotes.length;
+      if (n >= 2 && s.langVotes[n - 1] === s.langVotes[n - 2]) {
+        s.langLocked = true;
+      }
+      s.language = detected;
+      reportStatus('listening', { detectedLanguage: s.language, backend });
     } catch (error) {
       console.warn('Language detection failed, assuming English:', error);
-      s.language = 'en';
+      s.language = s.language || 'en';
+      s.langLocked = true;
     }
   }
 
-  const output = await transcriber(audio, { task: 'transcribe', language: s.language });
+  const output = await transcriber(audio, {
+    task: 'transcribe',
+    language: s.language,
+    // Suppress decoder repetition loops ("buy now buy now buy now…")
+    repetition_penalty: 1.3,
+    no_repeat_ngram_size: 3
+  });
   const text = cleanTranscript(output?.text);
-  if (!text || isHallucination(text) || text === s.lastText) return;
+  if (!text || isHallucination(text)) return;
+  // Whisper often re-emits the tail of the previous chunk; drop repeats.
+  if (text === s.lastText || s.lastText.endsWith(text)) return;
   s.lastText = text;
 
   let translated = text;
   try {
-    translated = await translate(text, s.targetLanguage);
+    // Telling the translator the source language (instead of auto) avoids
+    // misdetection on short fragments, and skips the network round-trip
+    // entirely when source and target match.
+    translated = await translate(text, s.targetLanguage, s.language || 'auto');
   } catch (error) {
     console.warn('Translation failed, showing original text:', error);
   }
