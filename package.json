@@ -1,24 +1,17 @@
 {
   "name": "video-translator-extension",
-  "version": "1.0.0",
-  "description": "Chrome extension for real-time video translation",
+  "version": "2.0.0",
+  "description": "Chrome extension: live translated subtitles for any video, using on-device Whisper speech recognition",
+  "private": true,
+  "type": "module",
   "scripts": {
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "test:coverage:watch": "jest --coverage --watch",
     "build": "node build.js",
-    "build:production": "NODE_ENV=production node build.js",
-    "test:compatibility": "node test-compatibility.js",
-    "test:all": "npm run test && npm run test:compatibility",
-    "prepare:release": "npm run test:all && npm run build:production",
-    "validate": "node test-compatibility.js",
-    "dev:setup": "node setup-dev.js",
-    "dev:restore": "node setup-dev.js --restore",
-    "dev:icons": "node create-dev-icons.js"
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.7.0"
   },
   "devDependencies": {
-    "jest": "^29.7.0",
-    "jest-environment-jsdom": "^30.2.0"
+    "esbuild": "^0.25.0"
   }
 }

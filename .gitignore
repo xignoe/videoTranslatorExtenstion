@@ -87,6 +87,13 @@ jspm_packages/
 dist/
 build/
 
+# Build artifacts (regenerate with `npm run build`)
+offscreen/offscreen.bundle.js
+vendor/
+
 # Temporary files
 tmp/
 temp/
+
+# Local Claude Code settings
+.claude/
