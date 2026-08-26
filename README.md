@@ -2,7 +2,7 @@
 
 A Chrome extension that generates **live translated subtitles for any video playing in your browser** — YouTube, news sites, random embedded players, anything that makes sound in a tab.
 
-Speech recognition runs **entirely on your device** using [OpenAI Whisper](https://github.com/openai/whisper) via [transformers.js](https://huggingface.co/docs/transformers.js). No API keys, no accounts, no audio ever leaves your machine. Only the recognized *text* is sent to a translation service (Google Translate's free endpoint, with LibreTranslate as fallback).
+Speech recognition runs **entirely on your device** using [OpenAI Whisper](https://github.com/openai/whisper) via [transformers.js](https://huggingface.co/docs/transformers.js). No API keys, no accounts, no audio ever leaves your machine. Only the recognized *text* is sent to a translation service (Google Translate's free endpoint, with MyMemory as fallback).
 
 ## How it works
 
@@ -60,7 +60,7 @@ The first start downloads the recognition model (~80 MB for the default "base" m
 - One tab at a time.
 - On machines without WebGPU, Whisper falls back to WASM (CPU) — use the *tiny* or *base* model there.
 - Videos inside cross-origin iframes are still heard and transcribed (audio capture is tab-wide), but the caption overlay falls back to a bar at the bottom of the window instead of sitting on the video.
-- Translation uses Google Translate's unofficial free endpoint; if it's ever rate-limited, the extension falls back to LibreTranslate, and if both fail, you see the untranslated transcript.
+- Translation uses Google Translate's unofficial free endpoint; if it's ever rate-limited, the extension falls back to MyMemory, and if both fail, you see the untranslated transcript.
 
 ## Development
 
@@ -75,7 +75,7 @@ Source layout:
 - `offscreen/offscreen.js` — audio capture, chunking, Whisper, translation
 - `offscreen/recorder-worklet.js` — AudioWorklet that streams mono PCM
 - `offscreen/textFilters.js` — transcript cleanup + Whisper hallucination filter
-- `offscreen/translator.js` — Google/LibreTranslate clients
+- `offscreen/translator.js` — Google/MyMemory translation clients
 - `content/content.js` — subtitle overlay rendering
 - `popup/` — UI
 

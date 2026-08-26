@@ -5,6 +5,10 @@
  * the popup, the offscreen document (audio capture + Whisper + translation),
  * and the content script (subtitle overlay).
  *
+ * The session is mirrored to chrome.storage.session because MV3 suspends
+ * this worker after ~30s of inactivity — an in-memory-only session would be
+ * lost and every later SUBTITLE message silently dropped.
+ *
  * Message protocol — every message has { target, type }:
  *   popup     -> background : START, STOP, GET_STATUS
  *   background-> offscreen  : OFFSCREEN_START, OFFSCREEN_STOP
@@ -18,6 +22,23 @@ const OFFSCREEN_URL = 'offscreen/offscreen.html';
 // Active session or null. { tabId, targetLanguage, sourceLanguage, model, status, detail }
 // status: starting | loading | listening | error
 let session = null;
+let sessionRestored = false;
+
+async function getSession() {
+  if (!sessionRestored) {
+    const stored = await chrome.storage.session.get('session');
+    // Only adopt the stored value if nothing newer happened in memory.
+    if (!sessionRestored) session = stored.session ?? session;
+    sessionRestored = true;
+  }
+  return session;
+}
+
+function setSession(next) {
+  session = next;
+  sessionRestored = true;
+  chrome.storage.session.set({ session: next }).catch(() => {});
+}
 
 function broadcastStatus() {
   // Popup may be closed; that's fine.
@@ -52,7 +73,7 @@ async function sendToOffscreen(message) {
 }
 
 async function startSession({ targetLanguage, sourceLanguage, model }) {
-  if (session) await stopSession();
+  if (await getSession()) await stopSession();
 
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab || !tab.id) throw new Error('No active tab found.');
@@ -60,12 +81,16 @@ async function startSession({ targetLanguage, sourceLanguage, model }) {
     throw new Error('This page cannot be captured. Open a normal web page with a video.');
   }
 
+  // The offscreen document must exist BEFORE the stream ID is minted:
+  // stream IDs expire within seconds if unconsumed, so the consumer has to
+  // be ready to call getUserMedia the moment the ID arrives.
+  await ensureOffscreenDocument();
+
   const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tab.id });
 
-  session = { tabId: tab.id, targetLanguage, sourceLanguage, model, status: 'starting', detail: null };
+  setSession({ tabId: tab.id, targetLanguage, sourceLanguage, model, status: 'starting', detail: null });
   broadcastStatus();
 
-  await ensureOffscreenDocument();
   await sendToOffscreen({
     type: 'OFFSCREEN_START',
     streamId,
@@ -80,8 +105,8 @@ async function startSession({ targetLanguage, sourceLanguage, model }) {
 }
 
 async function stopSession() {
-  const stopped = session;
-  session = null;
+  const stopped = await getSession();
+  setSession(null);
   chrome.action.setBadgeText({ text: '' });
 
   try {
@@ -97,41 +122,40 @@ async function stopSession() {
   broadcastStatus();
 }
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!message || message.target !== 'background') return;
-
+async function handleMessage(message) {
   switch (message.type) {
     case 'START':
-      startSession(message)
-        .then(() => sendResponse({ ok: true }))
-        .catch((error) => {
-          session = null;
-          chrome.action.setBadgeText({ text: '' });
-          broadcastStatus();
-          sendResponse({ ok: false, error: error.message });
-        });
-      return true; // keep the channel open for the async response
+      try {
+        await startSession(message);
+        return { ok: true };
+      } catch (error) {
+        setSession(null);
+        chrome.action.setBadgeText({ text: '' });
+        broadcastStatus();
+        return { ok: false, error: error.message };
+      }
 
     case 'STOP':
-      stopSession().then(() => sendResponse({ ok: true }));
-      return true;
+      await stopSession();
+      return { ok: true };
 
     case 'GET_STATUS':
-      sendResponse({ session });
-      return false;
+      return { session: await getSession() };
 
-    case 'STATUS':
-      if (session) {
-        session.status = message.status;
-        session.detail = message.detail ?? null;
+    case 'STATUS': {
+      const s = await getSession();
+      if (s) {
+        setSession({ ...s, status: message.status, detail: message.detail ?? null });
         broadcastStatus();
       }
-      return false;
+      return undefined;
+    }
 
-    case 'SUBTITLE':
-      if (session && message.tabId === session.tabId) {
+    case 'SUBTITLE': {
+      const s = await getSession();
+      if (s && message.tabId === s.tabId) {
         chrome.tabs
-          .sendMessage(session.tabId, {
+          .sendMessage(s.tabId, {
             target: 'content',
             type: 'SUBTITLE',
             text: message.text,
@@ -139,11 +163,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           })
           .catch(() => {});
       }
-      return false;
+      return undefined;
+    }
   }
+  return undefined;
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || message.target !== 'background') return;
+  handleMessage(message).then(sendResponse, (error) =>
+    sendResponse({ ok: false, error: error?.message || String(error) })
+  );
+  return true; // keep the channel open for the async response
 });
 
 // Stop when the captured tab closes.
-chrome.tabs.onRemoved.addListener((tabId) => {
-  if (session && session.tabId === tabId) stopSession();
+chrome.tabs.onRemoved.addListener(async (tabId) => {
+  const s = await getSession();
+  if (s && s.tabId === tabId) stopSession();
 });
