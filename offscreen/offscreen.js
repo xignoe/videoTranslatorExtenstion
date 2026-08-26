@@ -88,8 +88,9 @@ async function loadModel(modelKey) {
 async function start(message) {
   await stop();
 
-  await loadModel(message.model);
-
+  // Consume the stream ID immediately — Chrome expires unused tabCapture
+  // stream IDs after a few seconds, and the model load below can take
+  // minutes on first run. Audio buffers while the model loads.
   const media = await navigator.mediaDevices.getUserMedia({
     audio: {
       mandatory: {
@@ -116,7 +117,7 @@ async function start(message) {
   source.connect(recorder);
 
   const sourceLanguage = message.sourceLanguage || 'auto';
-  session = {
+  const s = (session = {
     tabId: message.tabId,
     targetLanguage: message.targetLanguage || 'en',
     language: sourceLanguage === 'auto' ? null : sourceLanguage,
@@ -129,11 +130,28 @@ async function start(message) {
     buffer: [],
     buffered: 0,
     transcribing: false,
+    ready: false,
     lastText: ''
-  };
+  });
 
   recorder.port.onmessage = (event) => onAudio(event.data);
+
+  // Load the model while audio accumulates (the rolling buffer keeps only
+  // the most recent BUFFER_CAP_SECONDS, so a long download is fine).
+  try {
+    await loadModel(message.model);
+  } catch (error) {
+    if (session === s) {
+      reportStatus('error', `Could not load the recognition model: ${error.message}`);
+      await stop();
+    }
+    return;
+  }
+  if (session !== s) return; // stopped while the model was loading
+
+  s.ready = true;
   reportStatus('listening', { backend });
+  maybeTranscribe();
 }
 
 async function stop() {
@@ -177,7 +195,7 @@ function tailIsQuiet(s) {
 
 async function maybeTranscribe() {
   const s = session;
-  if (!s || s.transcribing) return;
+  if (!s || !s.ready || s.transcribing) return;
   if (s.buffered < MIN_CHUNK_SECONDS * s.ctx.sampleRate) return;
   // Prefer cutting at a pause; force a cut if speech runs long.
   if (s.buffered < MAX_CHUNK_SECONDS * s.ctx.sampleRate && !tailIsQuiet(s)) return;
