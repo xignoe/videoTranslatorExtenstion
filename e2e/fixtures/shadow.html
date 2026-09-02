@@ -1,0 +1,18 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>shadow dom player</title>
+<style> body { margin:0; padding:40px; background:#123; color:#eee; font-family:sans-serif } </style></head>
+<body>
+<h1>Player inside an open shadow root</h1>
+<my-player id="player"></my-player>
+<script src="common.js"></script>
+<script>
+  class MyPlayer extends HTMLElement {
+    connectedCallback() {
+      const root = this.attachShadow({ mode: 'open' });
+      root.innerHTML = `<style>:host{display:block;width:560px} .wrap{border:4px solid #4af;padding:8px} video{width:100%;height:315px;background:#000;display:block}</style>
+        <div class="wrap"><div class="inner"><video id="v" autoplay playsinline controls src="${__fx.src()}"></video></div></div>`;
+    }
+  }
+  customElements.define('my-player', MyPlayer);
+</script>
+</body></html>

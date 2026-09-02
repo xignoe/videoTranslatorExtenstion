@@ -1,0 +1,8 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>embedded player</title>
+<style> body { margin:0; background:#000 } video { width:100%; height:100vh; display:block } </style></head>
+<body>
+<video id="v" autoplay playsinline controls></video>
+<script src="common.js"></script>
+<script> document.getElementById('v').src = __fx.src(); </script>
+</body></html>

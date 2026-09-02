@@ -1,0 +1,19 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>feed</title>
+<style>
+  body { margin:0; padding:20px; background:#fafafa; font-family:sans-serif }
+  .post { margin: 0 auto 16px; width: 640px; background:#fff; border:1px solid #ddd; padding:8px }
+  .post.big video { width: 620px; height: 349px; background:#000; display:block }
+  .post.small video { width: 400px; height: 225px; background:#000; display:block; margin: 0 auto }
+</style></head>
+<body>
+<h1>Feed: three autoplaying videos; only the smaller middle one is unmuted</h1>
+<div class="post big"><video id="v1" autoplay muted loop playsinline></video></div>
+<div class="post small"><video id="v2" autoplay loop playsinline></video></div>
+<div class="post big"><video id="v3" autoplay muted loop playsinline></video></div>
+<script src="common.js"></script>
+<script>
+  // The muted videos play a different clip so audio from the unmuted one is unambiguous.
+  v1.src = __fx.src('ja'); v2.src = __fx.src(); v3.src = __fx.src('ja');
+</script>
+</body></html>

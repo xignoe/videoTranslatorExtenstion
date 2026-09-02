@@ -1,0 +1,12 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>cross-origin iframe player</title>
+<style> body { margin:0; padding:40px; background:#321; color:#eee; font-family:sans-serif } iframe { width:700px; height:420px; border:2px solid #fa4; display:block } </style></head>
+<body>
+<h1>Cross-origin iframe player (top origin 127.0.0.1:4801, frame origin localhost:4802)</h1>
+<p>Some text above the player.</p>
+<iframe id="f" allow="autoplay; fullscreen; picture-in-picture"></iframe>
+<script src="common.js"></script>
+<script>
+  document.getElementById('f').src = 'http://localhost:4802/player.html?clip=' + __fx.clip();
+</script>
+</body></html>

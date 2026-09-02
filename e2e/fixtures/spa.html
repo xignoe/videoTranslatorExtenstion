@@ -1,0 +1,20 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>spa</title>
+<style> body { margin:0; padding:40px; background:#eef; font-family:sans-serif } video { width:600px; height:338px; background:#000; display:block } #stage2 video { margin-left: 120px; width: 480px; height: 270px } </style></head>
+<body>
+<h1>SPA page: pushState swaps the whole player</h1>
+<div id="app"></div>
+<script src="common.js"></script>
+<script>
+  function render(stage) {
+    const app = document.getElementById('app');
+    app.innerHTML = '';
+    const wrap = document.createElement('div'); wrap.id = 'stage' + stage;
+    const v = document.createElement('video'); v.id = 'v' + stage; v.autoplay = true; v.playsInline = true; v.controls = true;
+    v.src = __fx.src(stage === 1 ? __fx.clip() : (new URLSearchParams(location.search).get('clip2') || 'es'));
+    wrap.appendChild(v); app.appendChild(wrap);
+  }
+  window.gotoStage = (n) => { history.pushState({ stage: n }, '', location.pathname + location.search + '#stage' + n); render(n); };
+  render(location.hash === '#stage2' ? 2 : 1);
+</script>
+</body></html>

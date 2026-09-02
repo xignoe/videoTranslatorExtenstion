@@ -1,0 +1,33 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>plain video</title>
+<style>
+  body { margin: 0; padding: 40px; background: #222; color: #ddd; font-family: sans-serif; }
+  video { width: 640px; height: 360px; display: block; background: #000; }
+  /* Hostile CSS: a site that tries to hide or shrink any third-party overlay. */
+  vt-caption, [popover], body > :not(video):not(.controls), html > :not(body):not(head) {
+    display: none !important; opacity: 0 !important; visibility: hidden !important;
+    font-size: 1px !important; width: 0 !important; height: 0 !important;
+    transform: scale(0) !important; filter: blur(20px) !important; clip-path: inset(100%) !important;
+    pointer-events: none !important; position: absolute !important; left: -9999px !important;
+  }
+  * { font-size: 1px !important; line-height: 1px !important; }
+  .controls, .controls * { font-size: 14px !important; line-height: 20px !important; }
+  h1 { font-size: 14px !important; }
+</style></head>
+<body>
+<h1>Plain HTML5 video (hostile CSS)</h1>
+<video id="v" autoplay playsinline controls></video>
+<div class="controls">
+  <button id="fs">Fullscreen</button>
+  <button id="pip">Picture-in-Picture</button>
+  <span id="state"></span>
+</div>
+<script src="common.js"></script>
+<script>
+  const v = document.getElementById('v');
+  v.src = __fx.src();
+  document.getElementById('fs').onclick = () => v.requestFullscreen();
+  document.getElementById('pip').onclick = () => v.requestPictureInPicture();
+  setInterval(() => { document.getElementById('state').textContent = `t=${v.currentTime.toFixed(1)} paused=${v.paused} muted=${v.muted}`; }, 250);
+</script>
+</body></html>

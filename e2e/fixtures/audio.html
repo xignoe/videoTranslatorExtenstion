@@ -1,0 +1,10 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>audio only</title>
+<style> body { margin:0; padding:40px; background:#eee; color:#111; font-family:sans-serif } </style></head>
+<body>
+<h1>Audio-only page (podcast style)</h1>
+<audio id="a" autoplay controls></audio>
+<p>No video element on this page; captions must appear in a bottom bar.</p>
+<script src="common.js"></script>
+<script> document.getElementById('a').src = __fx.src(); </script>
+</body></html>
