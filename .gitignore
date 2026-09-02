@@ -1,0 +1,10 @@
+node_modules/
+extension/offscreen/*.bundle.js
+extension/offscreen/*.bundle.js.map
+extension/vendor/
+e2e/.out/
+e2e/.profile*/
+e2e/fixtures/clips/*.aiff
+.DS_Store
+e2e/full-run.txt
+e2e/clips.log
