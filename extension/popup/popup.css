@@ -1,0 +1,17 @@
+body { width: 320px; margin: 0; padding: 12px 14px 14px; font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #1c1c1e; background: #fff; }
+h1 { font-size: 15px; margin: 0 0 10px; }
+.row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 8px; }
+label { flex: 0 0 auto; }
+select { flex: 1 1 auto; min-width: 0; padding: 4px 6px; font: inherit; }
+#toggle { width: 100%; padding: 8px; font: inherit; font-weight: 600; border: 0; border-radius: 6px; background: #1a73e8; color: #fff; cursor: pointer; margin: 4px 0 10px; }
+#toggle:disabled { opacity: .6; cursor: default; }
+#toggle.stop { background: #d93025; }
+#status { padding: 8px 10px; border-radius: 6px; background: #f1f3f4; border-left: 4px solid #9aa0a6; word-break: break-word; }
+#status.starting, #status.loading { border-left-color: #f9ab00; background: #fef7e0; }
+#status.running { border-left-color: #188038; background: #e6f4ea; }
+#status.error { border-left-color: #d93025; background: #fce8e6; color: #a50e0e; }
+#detail { margin-top: 10px; font-size: 12px; color: #3c4043; }
+#detail > div { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; border-bottom: 1px solid #f1f3f4; }
+#detail .k { color: #5f6368; flex: 0 0 auto; }
+#detail span:last-child { text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#warning { margin-top: 10px; padding: 8px 10px; border-radius: 6px; background: #fef7e0; border-left: 4px solid #f9ab00; font-size: 12px; }

@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Video Translator",
+  "version": "1.0.0",
+  "description": "Live translated captions for any sound playing in any tab. Speech recognition (Whisper) runs on-device; only the recognized text is sent out for translation.",
+  "minimum_chrome_version": "128",
+  "permissions": ["tabCapture", "offscreen", "storage", "scripting", "activeTab"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup/popup.html", "default_title": "Video Translator" },
+  "content_scripts": [{
+    "matches": ["<all_urls>"],
+    "all_frames": true,
+    "match_about_blank": true,
+    "run_at": "document_end",
+    "js": ["content/content.js"]
+  }],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  }
+}
