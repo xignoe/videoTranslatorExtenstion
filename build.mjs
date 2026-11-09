@@ -2,8 +2,10 @@
 import * as esbuild from 'esbuild';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = path.dirname(new URL(import.meta.url).pathname);
+// fileURLToPath, not URL.pathname: on Windows the latter yields "/C:/..." with %20 for spaces.
+const root = path.dirname(fileURLToPath(import.meta.url));
 const vendorSrc = path.join(root, 'node_modules/onnxruntime-web/dist');
 const vendorDst = path.join(root, 'extension/vendor');
 

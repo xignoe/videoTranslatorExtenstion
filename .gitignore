@@ -2,6 +2,7 @@ node_modules/
 extension/offscreen/*.bundle.js
 extension/offscreen/*.bundle.js.map
 extension/vendor/
+dist/
 e2e/.out/
 e2e/.profile*/
 e2e/fixtures/clips/*.aiff

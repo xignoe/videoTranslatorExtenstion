@@ -10,8 +10,15 @@ select { flex: 1 1 auto; min-width: 0; padding: 4px 6px; font: inherit; }
 #status.starting, #status.loading { border-left-color: #f9ab00; background: #fef7e0; }
 #status.running { border-left-color: #188038; background: #e6f4ea; }
 #status.error { border-left-color: #d93025; background: #fce8e6; color: #a50e0e; }
-#detail { margin-top: 10px; font-size: 12px; color: #3c4043; }
+#hint { margin-top: 6px; font-size: 12px; color: #5f6368; }
+#warning { margin-top: 10px; padding: 8px 10px; border-radius: 6px; background: #fef7e0; border-left: 4px solid #f9ab00; font-size: 12px; word-break: break-word; }
+#setup { margin-bottom: 10px; padding: 8px 10px; border-radius: 6px; background: #fce8e6; border-left: 4px solid #d93025; font-size: 12px; }
+#setup p { margin: 6px 0 0; }
+#setup code { font: 11px ui-monospace, Menlo, Consolas, monospace; background: #fff; padding: 1px 4px; border-radius: 3px; }
+details { margin-top: 10px; font-size: 12px; color: #3c4043; }
+summary { cursor: pointer; color: #5f6368; user-select: none; }
+details[open] > summary { margin-bottom: 8px; }
+#options .row:last-child { margin-bottom: 0; }
 #detail > div { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; border-bottom: 1px solid #f1f3f4; }
 #detail .k { color: #5f6368; flex: 0 0 auto; }
 #detail span:last-child { text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#warning { margin-top: 10px; padding: 8px 10px; border-radius: 6px; background: #fef7e0; border-left: 4px solid #f9ab00; font-size: 12px; }

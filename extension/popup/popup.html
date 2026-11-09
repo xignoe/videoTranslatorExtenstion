@@ -7,34 +7,44 @@
 </head>
 <body>
 <h1>Video Translator</h1>
-<div class="row">
-  <label for="model">Model</label>
-  <select id="model">
-    <option value="tiny">Whisper tiny (fastest)</option>
-    <option value="base" selected>Whisper base</option>
-    <option value="small">Whisper small (most accurate)</option>
-  </select>
+<div id="setup" hidden>
+  <strong>This copy of Video Translator is not built yet.</strong>
+  <p>It was loaded from the source code, which cannot run as it is. Download the ready-to-use zip from the <a href="https://github.com/xignoe/videoTranslatorExtenstion/releases/latest" target="_blank" rel="noopener">Releases page</a> and load that folder instead.</p>
+  <p>To build it yourself, run <code>npm install</code> and <code>npm run build</code> in the project folder, then reload the extension.</p>
 </div>
 <div class="row">
-  <label for="source">Spoken language</label>
-  <select id="source">
-    <option value="auto" selected>Auto-detect</option>
-  </select>
-</div>
-<div class="row">
-  <label for="target">Caption language</label>
+  <label for="target">Translate to</label>
   <select id="target"></select>
 </div>
-<button id="toggle">Start</button>
+<button id="toggle">Start captions</button>
 <div id="status" class="idle"><span id="statusText">Ready</span></div>
-<div id="detail">
-  <div><span class="k">Backend</span><span id="backend">–</span></div>
-  <div><span class="k">Detected language</span><span id="lang">–</span></div>
-  <div><span class="k">Model download</span><span id="progress">–</span></div>
-  <div><span class="k">Latency (median)</span><span id="latency">–</span></div>
-  <div><span class="k">Last caption</span><span id="last">–</span></div>
-</div>
+<div id="hint" hidden></div>
 <div id="warning" hidden></div>
+<details id="options">
+  <summary>Options</summary>
+  <div class="row">
+    <label for="source">Spoken language</label>
+    <select id="source">
+      <option value="auto" selected>Auto-detect</option>
+    </select>
+  </div>
+  <div class="row">
+    <label for="model">Quality</label>
+    <select id="model">
+      <option value="tiny">Fast</option>
+      <option value="base" selected>Balanced</option>
+      <option value="small">Most accurate</option>
+    </select>
+  </div>
+</details>
+<details id="detail">
+  <summary>Details</summary>
+  <div><span class="k">Running on</span><span id="backend">–</span></div>
+  <div><span class="k">Detected language</span><span id="lang">–</span></div>
+  <div><span class="k">Speech model</span><span id="progress">–</span></div>
+  <div><span class="k">Caption delay</span><span id="latency">–</span></div>
+  <div><span class="k">Last caption</span><span id="last">–</span></div>
+</details>
 <script src="popup.js"></script>
 </body>
 </html>

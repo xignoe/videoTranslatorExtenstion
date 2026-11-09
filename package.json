@@ -1,11 +1,12 @@
 {
   "name": "video-translator",
-  "version": "1.0.0",
+  "version": "3.1.0",
   "private": true,
   "description": "Chrome MV3 extension: live on-device Whisper captions with translation for any tab audio",
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
+    "package": "node build.mjs && node package.mjs",
     "test": "node --test test/*.test.js",
     "clips": "bash e2e/gen-clips.sh",
     "e2e": "node e2e/run.mjs"
