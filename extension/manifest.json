@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Video Translator",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Live translated captions for any sound playing in any tab. Speech recognition (Whisper) runs on-device; only the recognized text is sent out for translation.",
   "minimum_chrome_version": "128",
   "permissions": [

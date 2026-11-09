@@ -4,9 +4,10 @@ import puppeteer from 'puppeteer';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { serve } from './server.mjs';
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const EXT_DIR = fs.realpathSync(path.join(ROOT, 'extension'));
 const OUT = path.join(ROOT, 'e2e', '.out');
 const A = 'http://127.0.0.1:4801', B = 'http://localhost:4802';
@@ -192,6 +193,7 @@ async function ensureSw() {
   return sw;
 }
 const swEval = async (fn) => (await ensureSw()).evaluate(fn);
+const badgeText = () => swEval(() => chrome.action.getBadgeText({ tabId: globalThis.__vt.session.tabId }));
 const swStatus = () => swEval(() => globalThis.__vt.status());
 const captionLog = () => swEval(() => globalThis.__vt.log());
 const langLog = () => swEval(() => globalThis.__vt.langLog());
@@ -346,6 +348,8 @@ async function basicSession(c, url, { clip, expectLang, sampleMs = 22000, frameS
   if (!c.ok(st.cls === 'running', `session did not reach running: [${st.cls}] ${st.text}`)) return null;
   const status = await swStatus();
   c.note(`backend=${status.backend}`);
+  const badge = await badgeText();
+  c.ok(badge === 'ON', `toolbar badge is "${badge}" while captioning, expected "ON"`);
   const frame = frameSel ? page.frames().find(frameSel) : page.mainFrame();
   await waitForMedia(frame);
   const prevUtt = await lastUtteranceId();
@@ -493,6 +497,8 @@ test('spa-and-navigation', async (c, r) => {
   const vis = checkOverlayStyle(c, navSamples, 'after navigation');
   for (const s of vis) if (!c.ok(anchoredTo(s, s.videos[0]), 'overlay not anchored after navigation')) break;
   c.ok((await swStatus()).status === 'running', 'session should still be running after navigation (no restart)');
+  const badge = await badgeText();
+  c.ok(badge === 'ON', `toolbar badge is "${badge}" after navigation, expected "ON"`);
 });
 
 test('chrome-url-error', async (c) => {
@@ -521,7 +527,10 @@ test('stop-cleans-up', async (c) => {
   const child = page.frames().find((f) => f.url().startsWith(B));
   await waitForCaption(Date.now(), 15000);
   await sleep(1500);
+  await swEval(() => { globalThis.__vtLastTab = globalThis.__vt.session.tabId; });
   await stopViaPopup();
+  const badge = await swEval(() => chrome.action.getBadgeText({ tabId: globalThis.__vtLastTab }));
+  c.ok(badge === '', `toolbar badge is "${badge}" after Stop, expected none`);
   await sleep(500);
   for (const f of [page.mainFrame(), child]) {
     const has = await f.evaluate(() => !!document.querySelector('vt-caption'));
